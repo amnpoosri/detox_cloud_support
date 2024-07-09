@@ -1,29 +1,26 @@
 buildscript {
+    apply from: './rninfo.gradle'
+
     ext {
         isOfficialDetoxLib = true
-        kotlinVersion = '1.6.10' // Aligned with RN .69's version bump
-        dokkaVersion = '1.6.0'
-        buildToolsVersion = '31.0.0'
-        compileSdkVersion = 31
-        targetSdkVersion = 31
+        kotlinVersion = '1.8.0'
+        dokkaVersion = '1.9.10'
+        buildToolsVersion = '34.0.0'
+        compileSdkVersion = 34
+        targetSdkVersion = 34
         minSdkVersion = 21
-
-        if (System.properties['os.arch'] == "aarch64") {
-            // For M1 Users we need to use the NDK 24 which added support for aarch64
-            ndkVersion = "24.0.8215888"
-        } else {
-            // Otherwise we default to the side-by-side NDK version from AGP.
-            ndkVersion = "21.4.7075529"
-        }
     }
     ext.detoxKotlinVersion = ext.kotlinVersion
 
     repositories {
-        mavenCentral()
         google()
+        mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.1.1'
+        if (!rnInfo.isRN71OrNewer) {
+            classpath "com.facebook.react:react-native-gradle-plugin"
+        }
+        classpath 'com.android.tools.build:gradle'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
         classpath "org.jetbrains.dokka:dokka-gradle-plugin:$dokkaVersion"
 
@@ -34,11 +31,16 @@ buildscript {
 
 allprojects {
     repositories {
-        mavenLocal()
-        mavenCentral()
         google()
-        maven {
-            url "$projectDir/../../node_modules/react-native/android"
+        mavenCentral()
+        mavenLocal()
+
+        // In RN's below 71, the native code comes from within node_modules/ rather
+        // than from maven-central.
+        if (!rnInfo.isRN71OrNewer) {
+            maven {
+                url "$projectDir/../../node_modules/react-native/android"
+            }
         }
     }
 }

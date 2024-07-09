@@ -25,9 +25,11 @@ class TapAtPointAction extends Action {
 }
 
 class LongPressAction extends Action {
-  constructor() {
+  constructor(point, duration) {
     super();
-    this._call = invoke.callDirectly(ViewActionsApi.longClick());
+
+    const filteredArgs = (point ? [point.x, point.y] : []).concat(duration ? [duration] : []);
+    this._call = invoke.callDirectly(DetoxActionApi.longPress(...filteredArgs));
   }
 }
 
@@ -43,6 +45,32 @@ class PressKeyAction extends Action {
     super();
     this._call = invoke.callDirectly(ViewActionsApi.pressKey(value));
   }
+}
+
+class LongPressAndDragAction extends Action {
+  constructor(duration, normalizedPositionX, normalizedPositionY, targetElement, normalizedTargetPositionX, normalizedTargetPositionY, speed, holdDuration) {
+    super();
+
+    assertNormalized({ normalizedPositionX });
+    assertNormalized({ normalizedPositionY });
+    assertNormalized({ normalizedTargetPositionX });
+    assertNormalized({ normalizedTargetPositionY });
+    assertSpeed({ speed });
+
+    this._call = invoke.callDirectly(
+      DetoxActionApi.longPressAndDrag(
+        duration,
+        normalizedPositionX,
+        normalizedPositionY,
+        targetElement._call(),
+        normalizedTargetPositionX,
+        normalizedTargetPositionY,
+        speed === 'fast',
+        holdDuration
+      )
+    );
+  }
+
 }
 
 class TypeTextAction extends Action {
@@ -81,10 +109,10 @@ class ScrollAmountStopAtEdgeAction extends Action {
 }
 
 class ScrollEdgeAction extends Action {
-  constructor(edge) {
+  constructor(edge, startPositionX = -1, startPositionY = -1) {
     super();
 
-    this._call = invoke.callDirectly(DetoxActionApi.scrollToEdge(edge));
+    this._call = invoke.callDirectly(DetoxActionApi.scrollToEdge(edge, startPositionX, startPositionY));
   }
 }
 
@@ -124,6 +152,13 @@ class ScrollToIndex extends Action {
   }
 }
 
+class SetDatePickerDateAction extends Action {
+  constructor(dateString, formatString) {
+    super();
+    this._call = invoke.callDirectly(DetoxActionApi.setDatePickerDate(dateString, formatString));
+  }
+}
+
 class AdjustSliderToPosition extends Action {
   constructor(newPosition) {
     super();
@@ -138,11 +173,19 @@ class TakeElementScreenshot extends Action {
   }
 }
 
+class AccessibilityActionAction extends Action {
+  constructor(actionName) {
+    super();
+    this._call = invoke.callDirectly(DetoxActionApi.accessibilityAction(actionName));
+  }
+}
+
 module.exports = {
   Action,
   TapAction,
   TapAtPointAction,
   LongPressAction,
+  LongPressAndDragAction,
   MultiClickAction,
   PressKeyAction,
   TypeTextAction,
@@ -155,5 +198,7 @@ module.exports = {
   SwipeAction,
   TakeElementScreenshot,
   ScrollToIndex,
+  SetDatePickerDateAction,
   AdjustSliderToPosition,
+  AccessibilityActionAction
 };

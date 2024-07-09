@@ -130,6 +130,7 @@ class OmniListener implements DetoxCircusListener {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 class CustomEnvironment extends DetoxCircusEnvironment {
   constructor(config: any, context: any) {
     super(config, context);
@@ -140,6 +141,14 @@ class CustomEnvironment extends DetoxCircusEnvironment {
       NoneListener,
       OmniListener,
     });
+  }
+
+  handleTestEvent(event: Circus.Event, state: Circus.State): void | Promise<void> {
+    if (event.name === 'test_done') {
+      console.log(event.test.name);
+    }
+
+    return super.handleTestEvent(event, state);
   }
 }
 

@@ -8,7 +8,7 @@ const { escape } = require('../../../../../utils/pipeCommands');
 const DeviceHandle = require('../tools/DeviceHandle');
 const EmulatorHandle = require('../tools/EmulatorHandle');
 
-const INSTALL_TIMEOUT = 45000; // TODO Double check 45s makes sense
+const INSTALL_TIMEOUT = 45000;
 
 class ADB {
   constructor() {
@@ -18,6 +18,7 @@ class ADB {
 
   async devices() {
     const { stdout } = await this.adbCmd('', 'devices', { verbosity: 'high' });
+    /** @type {DeviceHandle[]} */
     const devices = _.chain(stdout)
       .trim()
       .split('\n')
@@ -344,7 +345,6 @@ class ADB {
     return this.adbCmd(deviceId, `emu kill`);
   }
 
-  // TODO refactor the whole thing so as to make usage of BinaryExec -- similar to EmulatorExec
   async adbCmd(deviceId, params, options = {}) {
     const serial = `${deviceId ? `-s ${deviceId}` : ''}`;
     const cmd = `"${this.adbBin}" ${serial} ${params}`;

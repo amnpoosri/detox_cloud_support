@@ -99,7 +99,31 @@ Grants or denies runtime permissions to your application. This will cause the ap
 await device.launchApp({permissions: {calendar: 'YES'}});
 ```
 
-Detox uses [AppleSimUtils](https://github.com/wix/AppleSimulatorUtils) to implement this functionality for iOS simulators. Read about the different types of permissions and how to set them in AppleSimUtils' documentation and by checking out Detox’s [own test suite](https://github.com/wix/Detox/tree/a9a09246c05733f6b91cfcc0dba05a4714abca92/detox/test/e2e/13.permissions.test.js).
+Detox uses [AppleSimUtils](https://github.com/wix/AppleSimulatorUtils) and [`xcrun simctl`](https://nshipster.com/simctl/) to implement this functionality for iOS simulators.
+Please make sure you have the most recent version of both tools installed, since we rely on their latest versions.
+
+##### Supported Permissions
+
+| Permission | Values                  | Notes                                                         |
+|------------|-------------------------|---------------------------------------------------------------|
+| location   | always / inuse / never / unset | inuse - provides location access only when the app is in use  |
+| contacts   | YES / NO / unset / limited     | limited - grants limited access to contacts                   |
+| photos     | YES / NO / unset / limited     | limited - grants limited access to photos                     |
+| calendar   | YES / NO / unset        |                                                               |
+| camera     | YES / NO / unset        |                                                               |
+| medialibrary | YES / NO / unset      |                                                               |
+| microphone | YES / NO / unset        |                                                               |
+| motion     | YES / NO / unset        |                                                               |
+| reminders  | YES / NO / unset        |                                                               |
+| siri       | YES / NO / unset        |                                                               |
+| notifications | YES / NO / unset     | Requires AppleSimUtils; unsupported by simctl                |
+| health     | YES / NO / unset        | Requires AppleSimUtils; unsupported by simctl                |
+| homekit    | YES / NO / unset        | Requires AppleSimUtils; unsupported by simctl                |
+| speech     | YES / NO / unset        | Requires AppleSimUtils; unsupported by simctl                |
+| faceid     | YES / NO / unset        | Requires AppleSimUtils; unsupported by simctl                |
+| userTracking | YES / NO / unset      | Requires AppleSimUtils; unsupported by simctl                |
+
+Check Detox's [own test suite](https://github.com/wix/Detox/blob/master/detox/test/e2e/13.permissions.test.js) for usage examples.
 
 #### 3. `url`—Launching with URL
 
@@ -220,12 +244,35 @@ await device.launchApp({
 
 #### 11. `detoxURLBlacklistRegex`—Initialize the URL Blacklist at app launch
 
-Launches the app with a URL blacklist to disable network synchronization on certain endpoints. Useful if the app makes frequent network calls to blacklisted endpoints upon startup.
+Launches the app with a URL blacklist to disable network synchronization on certain endpoints.
+Useful if the app makes frequent network calls to blacklisted endpoints upon startup.
+
+> Note that due to the complexity of reg-exps and interoperability concerns, the implementation is fairly sensitive to the format of the string of urls.
+> Please do your best to follow the example below:
 
 ```js
 await device.launchApp({
   newInstance: true,
-  launchArgs: { detoxURLBlacklistRegex: ' \\("http://192.168.1.253:19001/onchange","https://e.crashlytics.com/spi/v2/events"\\)' },
+  launchArgs: { detoxURLBlacklistRegex: '\\("^http://192\.168\.1\.253:\\d{4}/.*","https://e\.crashlytics\.com/spi/v2/events"\\)' },
+});
+```
+
+#### 12. `detoxDisableWebKitSecurity`—Disable WebKit Security (iOS Only)
+
+Disables WebKit security on iOS. Default is `false`.
+
+This is useful for testing web views with iframes that loads CORS-protected content.
+
+:::caution Important
+
+Some pages may not load correctly when WebKit security is disabled (for example, PCI DSS-compliant pages).
+Disabling WebKit security may cause errors when loading pages that have strict security policies.
+
+:::
+
+```js
+await device.launchApp({
+  launchArgs: { detoxDisableWebKitSecurity: true }
 });
 ```
 
@@ -311,7 +358,7 @@ Check out Detox’s [own test suite.](https://github.com/wix/Detox/tree/a9a09246
 
 Sets the simulator/emulator location to the given latitude and longitude.
 
-> On iOS `setLocation` is dependent on [`fbsimctl`](https://github.com/facebook/idb/tree/4b7929480c3c0f158f33f78a5b802c1d0e7030d2/fbsimctl) which [is now deprecated](https://github.com/wix/Detox/issues/1371). If `fbsimctl` is not installed, the command will fail, asking for it to be installed.
+> On iOS `setLocation` depends on `xcrun simctl`, and we recommend using its latest version.
 >
 > On Android `setLocation` will work with both Android Emulator (bundled with Android development tools) and Genymotion. The correct permissions must be set in your app manifest.
 
@@ -439,7 +486,7 @@ await device.setStatusBar({
   // Set the date or time to a fixed value.
   // If the string is a valid ISO date string it will also set the date on relevant devices.
   dataNetwork: "wifi",
-  // If specified must be one of 'wifi', '3g', '4g', 'lte', 'lte-a', or 'lte+'.
+  // If specified must be one of 'hide', 'wifi', '3g', '4g', 'lte', 'lte-a', 'lte+', '5g', '5g+', '5g-uwb', or '5g-uc'.
   wifiMode: "failed",
   // If specified must be one of 'searching', 'failed', or 'active'.
   wifiBars: "2",
@@ -448,6 +495,8 @@ await device.setStatusBar({
   // If specified must be one of 'notSupported', 'searching', 'failed', or 'active'.
   cellularBars: "3",
   // If specified must be 0-4.
+  operatorName: "A1",
+  // Set the cellular operator/carrier name. Use '' for the empty string.
   batteryState: "charging",
   // If specified must be one of 'charging', 'charged', or 'discharging'.
   batteryLevel: "50",

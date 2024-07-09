@@ -8,8 +8,8 @@ Use [expectations](expect.md) to verify element states.
 
 - [`.tap()`](#tappoint)
 - [`.multiTap()`](#multitaptimes)
-- [`.longPress()`](#longpressduration)
-- [`.longPressAndDrag()`](#longpressanddragduration-normalizedpositionx-normalizedpositiony-targetelement-normalizedtargetpositionx-normalizedtargetpositiony-speed-holdduration--ios-only) **iOS only**
+- [`.longPress()`](#longpresspoint-duration)
+- [`.longPressAndDrag()`](#longpressanddragduration-normalizedpositionx-normalizedpositiony-targetelement-normalizedtargetpositionx-normalizedtargetpositiony-speed-holdduration)
 - [`.swipe()`](#swipedirection-speed-normalizedoffset-normalizedstartingpointx-normalizedstartingpointy)
 - [`.pinch()`](#pinchscale-speed-angle--ios-only) **iOS only**
 - [`.scrollToIndex()`](#scrolltoindexindex--android-only) **Android only**
@@ -22,10 +22,11 @@ Use [expectations](expect.md) to verify element states.
 - [`.tapReturnKey()`](#tapreturnkey)
 - [`.tapBackspaceKey()`](#tapbackspacekey)
 - [`.setColumnToValue()`](#setcolumntovaluecolumn-value--ios-only) **iOS only**
-- [`.setDatePickerDate()`](#setdatepickerdatedatestring-dateformat--ios-only) **iOS only**
+- [`.setDatePickerDate()`](#setdatepickerdatedatestring-dateformat)
 - [`.adjustSliderToPosition()`](#adjustslidertopositionnormalizedposition)
 - [`.getAttributes()`](#getattributes)
 - [`.takeScreenshot(name)`](#takescreenshotname)
+- [`.performAccessibilityAction()`](#performaccessibilityactionactionname)
 
 ### `tap(point)`
 
@@ -50,18 +51,28 @@ Simulates multiple taps on the element at its activation point. All taps are app
 await element(by.id('tappable')).multiTap(3);
 ```
 
-### `longPress(duration)`
+### `longPress(point, duration)`
 
-Simulates a long press on the element at its activation point.
+Simulates a long press on the element at its activation point or at the specified point.
 
-`duration` (iOS only) — press during time, in milliseconds. Optional (default is 1000 ms).
+`point` — a point in the element’s coordinate space (optional, object with `x` and `y` numerical values, default is `null`).
+`duration` — press during time, in milliseconds. Optional (defaults to the standard long-press duration for the platform).
 
 ```js
 await element(by.id('tappable')).longPress();
+await element(by.id('tappable')).longPress({x:5, y:10});
 await element(by.id('tappable')).longPress(1500);
+await element(by.id('tappable')).longPress({x:5, y:10}, 1500);
 ```
 
-### `longPressAndDrag(duration, normalizedPositionX, normalizedPositionY, targetElement, normalizedTargetPositionX, normalizedTargetPositionY, speed, holdDuration)`  iOS only
+:::note Important
+
+Custom durations should be used cautiously, as they can affect test consistency and user experience expectations.
+They are typically necessary when testing components that behave differently from the platform's defaults or when simulating unique user interactions.
+
+:::
+
+### `longPressAndDrag(duration, normalizedPositionX, normalizedPositionY, targetElement, normalizedTargetPositionX, normalizedTargetPositionY, speed, holdDuration)`
 
 Simulates a long press on the element and then drag it to a position of another element.
 
@@ -143,15 +154,17 @@ Continuously scrolls the scroll element until the specified expectation is resol
 await waitFor(element(by.text('Text5'))).toBeVisible().whileElement(by.id('ScrollView630')).scroll(50, 'down');
 ```
 
-### `scrollTo(edge)`
+### `scrollTo(edge[, startPositionX, startPositionY])`
 
 Simulates a scroll to the specified edge.
 
-`edge`—the edge to scroll to (valid input: `"left"`/`"right"`/`"top"`/`"bottom"`)
+`edge`—the edge to scroll to (valid input: `"left"`/`"right"`/`"top"`/`"bottom"`) <br/>
+`startPositionX`—the normalized x percentage of the element to use as scroll start point (optional, valid input: \[0.0, 1.0], `NaN`—choose an optimal value automatically, default is `NaN`) <br/>
+`startPositionY`—the normalized y percentage of the element to use as scroll start point (optional, valid input: \[0.0, 1.0], `NaN`—choose an optimal value automatically, default is `NaN`)
 
 ```js
 await element(by.id('scrollView')).scrollTo('bottom');
-await element(by.id('scrollView')).scrollTo('top');
+await element(by.id('scrollView')).scrollTo('top', NaN, 0.2);
 ```
 
 ### `typeText(text)`
@@ -214,7 +227,7 @@ Sets the element’s specified column to the specified value, using the system�
 
 Values accepted by this method are strings only, and the system will do its best to match complex picker view cells to the string.
 
-This function does not support date pickers. Use [`.setDatePickerDate()`](#setdatepickerdatedatestring-dateformat--ios-only) instead.
+This function does not support date pickers. Use [`.setDatePickerDate()`](#setdatepickerdatedatestring-dateformat) instead.
 
 `column`—the element’s column to set (valid input: number, 0 and above) <br/>
 `value`—the string value to set (valid input: string)
@@ -226,19 +239,39 @@ await element(by.id('pickerView')).setColumnToValue(2, "Hello World");
 
 > **Note:** When working with date pickers, you should always set an explicit locale when launching your app in order to prevent flakiness from different date and time styles. See [here](device.md#9-languageandlocalelaunch-with-a-specific-language-andor-local-ios-only) for more information.
 
-### `setDatePickerDate(dateString, dateFormat)`  iOS only
+### `setDatePickerDate(dateString, dateFormat)`
 
-Sets the element’s date to the specified date string, parsed using the specified date format.
+Sets the date-picker’s date to the specified date and time.
 
-The specified date string is converted by the system to an [`NSDate`](https://developer.apple.com/documentation/foundation/nsdate) object, using [`NSDateFormatter`](https://developer.apple.com/documentation/foundation/dateformatter) with the specified date format, or [`NSISO8601DateFormatter`](https://developer.apple.com/documentation/foundation/iso8601dateformatter) in case of ISO 8601 date strings. If you use JavaScript’s [Date.toISOString()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/toISOString) or otherwise provide a valid ISO 8601 date string, set the date format to `"ISO8601"`, which is supported as a special case.
+`dateString`—The date to set. Should match the format provided by `dateFormat`.<br/>
+`dateFormat`—The format of `dateString`. Should be either [`'ISO8601'`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/toISOString), or an explicit date representation format, as supported by [`NSDateFormatter`] on iOS / [`DateTimeFormatter`] on Android (e.g. `'yyyy/MM/dd'`).
 
-`dateString`—the date to set (valid input: valid, parsable date string) <br/>
-`dateFormat`—the date format of `dateString` (valid input: `"ISO8601"` or a valid, parsable date format supported by [`NSDateFormatter`](https://developer.apple.com/documentation/foundation/dateformatter))
+> _The recommended `dateFormat` is `ISO8601`._
+
+Examples:
 
 ```js
-await element(by.id('datePicker')).setDatePickerDate('2019-02-06T05:10:00-08:00', "ISO8601");
-await element(by.id('datePicker')).setDatePickerDate('2019/02/06', "yyyy/MM/dd");
+const datePicker = element(by.id('datePicker'));
+
+// ISO8601:
+await datePicker.setDatePickerDate('2019-02-06T05:10:00-08:00', 'ISO8601');
+await datePicker.setDatePickerDate(new Date().toISOString(), 'ISO8601'); // toISOString returns an ISO8601 format with no timezone (UTC-0)
+
+// Explicit format:
+await datePicker.setDatePickerDate('2019/02/06', "yyyy/MM/dd");
 ```
+
+:::info
+
+As far as element-matching is concerned, on Android, older versions of the popular [`@react-native-community/datetimepicker`] package don’t allow for the specification of your own [`testID`] prop for the date-picker component. Therefore, you'd have to either upgrade your package  to a newer version containing [PR datetimepicker#705] inside, or use Detox's [`by.type`] matcher as a workaround. For example:
+
+```js
+const datePicker = device.getPlatform() === 'android'
+  ? element(by.type('android.widget.DatePicker'))
+  : element(by.id('datePicker'));
+```
+
+:::
 
 ### `adjustSliderToPosition(normalizedPosition)`
 
@@ -257,19 +290,19 @@ Returns an object, representing various attributes of the element.
 Retrieved attributes are:
 
 - `text`: The text value of any textual element.
-- `label`: The label of the element. Matches `accessibilityLabel` for iOS, and `contentDescription` for android.
+- `label`: The label of the element. Matches `accessibilityLabel` for iOS, and `contentDescription` for android. Refer to the [`.toHaveLabel()` API](./expect.md#tohavelabellabel) in order to learn about caveats associated with this attribute in React Native apps.
 - `placeholder`: The placeholder text value of the element. Matches `hint` on android.
 - `enabled`: Whether the element is enabled for user interaction.
 - `identifier`: The identifier of the element. Matches `accessibilityIdentifier` on iOS, and the main view tag, on Android - both commonly **holding the component’s test ID in React Native apps**.
 - `visible`: Whether the element is visible. On iOS, visibility is calculated for the [activation point](https://developer.apple.com/documentation/objectivec/nsobject/1615179-accessibilityactivationpoint). On Android, the attribute directly holds the value returned by [View.getLocalVisibleRect()](https://developer.android.com/reference/kotlin/android/view/View#getglobalvisiblerect)).
 - `value`: The value of the element, where applicable. For example: the position of a slider, or whether a checkbox has been marked. Matches `accessibilityValue`, on iOS.
+- `frame`: The frame of the element, in screen coordinate space.
 
 #### iOS-Only
 
 - `activationPoint`: The [activation point](https://developer.apple.com/documentation/objectivec/nsobject/1615179-accessibilityactivationpoint) of the element, in element coordinate space.
 - `normalizedActivationPoint`: The activation point of the element, in normalized percentage (\[0.0, 1.0]).
 - `hittable`: Whether the element is hittable at the activation point.
-- `frame`: The frame of the element, in screen coordinate space.
 - `elementFrame`: The frame of the element, in container coordinate space.
 - `elementBounds`: The bounds of the element, in element coordinate space.
 - `safeAreaInsets`: The safe area insets of the element, in element coordinate space.
@@ -283,8 +316,8 @@ Retrieved attributes are:
 #### Android-Only
 
 - `visibility`: The OS visibility type associated with the element: `visible`, `invisible` or `gone`.
-- `width`: Width of the element, in pixels.
-- `height`: Height of the element, in pixels.
+- `width`: Width of the element, in pixels (deprecated).
+- `height`: Height of the element, in pixels (deprecated).
 - `elevation`: Elevation of the element.
 - `alpha`: Alpha value for the element.
 - `focused`: Whether the element is the one currently in focus.
@@ -296,6 +329,10 @@ If the value for a given attribute is null or cannot be otherwise computed, the 
 If the query matches multiple elements, the attributes of all matched elements is returned as an array of objects under the `elements` key.
 
 ```js
+// import jestExpect from 'expect';
+const jestExpect = require('expect').default;
+
+// ...
 const attributes = await element(by.text('Tap Me')).getAttributes();
 jestExpect(attributes.text).toBe('Tap Me');
 
@@ -309,6 +346,16 @@ jestExpect(multipleMatchedElements.elements[0].identifier).toBe('FirstElement');
 Takes a screenshot of the matched element. For full details on taking screenshots with Detox, refer to the [screenshots guide](../guide/taking-screenshots.md).
 
 `name`—the name of the screenshot
+
+### `performAccessibilityAction(actionName)`
+
+Triggers an [accessibility action](https://reactnative.dev/docs/accessibility#accessibility-actions).
+
+`actionName`—the name of the accessibility action <br/>
+
+```js
+await element(by.id('scrollView')).performAccessibilityAction("activate");
+```
 
 ## Deprecated Methods
 
@@ -340,3 +387,17 @@ Simulates a pinch on the element with the provided options.
 ```js
 await element(by.id('PinchableScrollView')).pinchWithAngle('outward', 'slow', 0);
 ```
+
+[`testID`]: ../guide/test-id.md
+
+[`by.type`]: ../api/matchers.md#bytypeclassname
+
+[`Date.prototype.toISOString()`]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/toISOString
+
+[`NSDateFormatter`]: https://developer.apple.com/documentation/foundation/dateformatter
+
+[`DateTimeFormatter`]: https://docs.oracle.com/javase/8/docs/api/java/time/format/DateTimeFormatter.html
+
+[`@react-native-community/datetimepicker`]: https://www.npmjs.com/package/@react-native-community/datetimepicker
+
+[PR datetimepicker#705]: https://github.com/react-native-datetimepicker/datetimepicker/pull/705

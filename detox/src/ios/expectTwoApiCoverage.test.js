@@ -7,6 +7,7 @@ describe('expectTwo API Coverage', () => {
 
     e = new IosExpect({
       invocationManager: new MockExecutor(),
+      xcuitestRunner: new MockExecutor(),
     });
   });
 
@@ -78,6 +79,18 @@ describe('expectTwo API Coverage', () => {
       await expectToThrow(() => e.element(e.by.id('test').withAncestor('notAMatcher')));
       await expectToThrow(() => e.element(e.by.id('test').withDescendant('notAMatcher')));
       // await expectToThrow(() => e.element(e.by.id('test').and('notAMatcher')));
+
+      // Web matchers
+      await expectToThrow(() => e.web.element(e.by.web.id(1)));
+      await expectToThrow(() => e.web.element(e.by.web.label(1)));
+      await expectToThrow(() => e.web.element(e.by.web.className(1)));
+      await expectToThrow(() => e.web.element(e.by.web.cssSelector(1)));
+      await expectToThrow(() => e.web.element(e.by.web.name(1)));
+      await expectToThrow(() => e.web.element(e.by.web.xpath(1)));
+      await expectToThrow(() => e.web.element(e.by.web.href(1)));
+      await expectToThrow(() => e.web.element(e.by.web.hrefContains(1)));
+      await expectToThrow(() => e.web.element(e.by.web.tag(1)));
+      await expectToThrow(() => e.web.element(e.by.web.value(1)));
     });
 
     it(`should throw for invalid toBeVisible parameters`, async () => {
@@ -85,6 +98,28 @@ describe('expectTwo API Coverage', () => {
       await expectToThrow(() =>e.expect(e.element(e.by.accessibilityLabel('test'))).toBeVisible(120));
       await expectToThrow(() =>e.waitFor(e.element(e.by.accessibilityLabel('test'))).toBeVisible(0));
       await expectToThrow(() =>e.e.waitFor(e.element(e.by.accessibilityLabel('test'))).toBeVisible(120));
+    });
+
+    describe('System', () => {
+      it('should throw for invalid matcher parameters', async () => {
+        await expectToThrow(() => e.system.element(e.by.system.label(5)));
+        await expectToThrow(() => e.system.element(e.by.system.type(5)));
+      });
+
+      it('should throw for invalid matchers', async () => {
+        await expectToThrow(() => e.system.element(e.by.value('test')));
+      });
+    });
+
+    describe('Secured Web', () => {
+      it('should throw for invalid matcher parameters', async () => {
+        await expectToThrow(() => e.web.element(e.by.web.label(5)).asSecured());
+        await expectToThrow(() => e.web.element(e.by.web.type(5)).asSecured());
+      });
+
+      it('should throw for invalid matchers', async () => {
+        await expectToThrow(() => e.web.element(e.by.web.value('test')).asSecured());
+      });
     });
   });
 
@@ -96,11 +131,22 @@ describe('expectTwo API Coverage', () => {
     it(`expect with wrong parameters should throw`, async () => {
       await expectToThrow(() => e.expect('notAnElement'));
       await expectToThrow(() => e.expect(e.element('notAMatcher')));
+      await expectToThrow(() => e.expect(e.web.element('notAMatcher')));
+      await expectToThrow(() => e.expect(e.web.element(e.by.web.id('id'))).toHaveText(0));
+    });
+
+    it('should not throw on system assertions', async () => {
+      await e.expect(e.system.element(e.by.system.label('Tap Me')).atIndex(2)).toExist();
+      await e.expect(e.system.element(e.by.system.type('button'))).not.toExist();
+    });
+
+    it('should not throw on secured web assertions', async () => {
+      await e.expect(e.web.element(e.by.web.label('Tap Me')).atIndex(0).asSecured()).toExist();
+      await e.expect(e.web.element(e.by.web.type('button')).asSecured()).not.toExist();
     });
   });
 
   describe('Actions', () => {
-
     it(`setColumnToValue()`, async () => {
       await e.element(e.by.id('pickerView')).setColumnToValue(1, '6');
       await expectToThrow(() => e.element(e.by.id('pickerView')).setColumnToValue('notAColumn', 1));
@@ -114,6 +160,8 @@ describe('expectTwo API Coverage', () => {
       await e.element(e.by.label('Tap Me')).tapAtPoint({ x: 10, y: 10 });
       await e.element(e.by.label('Tap Me')).longPress();
       await e.element(e.by.label('Tap Me')).longPress(2000);
+      await e.element(e.by.label('Tap Me')).longPress({ x: 10, y: 10 }, 2000);
+      await e.element(e.by.label('Tap Me')).longPress({ x: 10, y: 10 });
       await e.element(e.by.id('someId')).multiTap(3);
       await e.element(e.by.id('someId')).typeText('passcode');
       await e.element(e.by.id('someId')).tapBackspaceKey();
@@ -150,6 +198,7 @@ describe('expectTwo API Coverage', () => {
       await e.element(e.by.id('someId')).atIndex(1).tap();
       await e.element(e.by.id('someId')).setDatePickerDate('2019-2-8T05:10:00-08:00', 'yyyy-MM-dd\'T\'HH:mm:ssZZZZZ');
       await e.element(e.by.id('slider')).adjustSliderToPosition(0.5);
+      await e.element(e.by.id('someId')).performAccessibilityAction('activate');
     });
 
     it(`interactions with wrong parameters should throw`, async () => {
@@ -180,6 +229,8 @@ describe('expectTwo API Coverage', () => {
 
       await expectToThrow(() => e.element(e.by.id('someId')).scrollTo(0));
       await expectToThrow(() => e.element(e.by.id('someId')).scrollTo('noDirection'));
+      await expectToThrow(() => e.element(e.by.id('someId')).scrollTo('top','Nan', 0.5));
+      await expectToThrow(() => e.element(e.by.id('someId')).scrollTo('top', 0.5, 'Nan'));
 
       await expectToThrow(() => e.element(e.by.id('someId')).swipe(4, 'fast'));
       await expectToThrow(() => e.element(e.by.id('someId')).swipe('left', 'fast', 20));
@@ -200,11 +251,30 @@ describe('expectTwo API Coverage', () => {
       await expectToThrow(() => e.element(e.by.id('slider')).adjustSliderToPosition(-1));
       await expectToThrow(() => e.element(e.by.id('slider')).adjustSliderToPosition(NaN));
 
+      await expectToThrow(() => e.element(e.by.id('someId')).longPress('notANumber'));
+      await expectToThrow(() => e.element(e.by.id('someId')).longPress(1000, 1000));
+      await expectToThrow(() => e.element(e.by.id('someId')).longPress({ x: 'notANumber', y: 10 }, 1000));
+      await expectToThrow(() => e.element(e.by.id('someId')).longPress(1000, { x: 10, y: 5 }));
+      await expectToThrow(() => e.element(e.by.id('someId')).longPress({ x: 10, y: 'notANumber' }, 1000));
+
       await expectToThrow(() => e.element(e.by.id('elementToDrag')).longPressAndDrag(1000, 0.5, 0.5, e.by.id('matcherNotElement')));
       await expectToThrow(() => e.element(e.by.id('elementToDrag')).longPressAndDrag('notANumber', 0.5, 0.5, e.element(e.by.id('targetElement'))));
       await expectToThrow(() => e.element(e.by.id('elementToDrag')).longPressAndDrag(1000, 0.5, 0.5, e.element(e.by.id('targetElement')), 0.5, 0.5, 'slow', 'notANumber'));
+
+      await expectToThrow(() => e.element(e.by.id('someId')).performAccessibilityAction());
     });
 
+    it('should properly call system interactions', async () => {
+      await e.system.element(e.by.system.label('Tap Me')).atIndex(2).tap();
+    });
+
+    it('should throw for invalid element-index for system interactions', async () => {
+      await expectToThrow(() => e.system.element(e.by.system.label('tapMe')).atIndex('NaN'));
+    });
+
+    it('should properly call secured web interactions', async () => {
+      await e.web.element(e.by.web.label('Tap Me')).atIndex(0).asSecured().tap();
+    });
   });
 
   describe('WaitFor', () => {
@@ -223,6 +293,8 @@ describe('expectTwo API Coverage', () => {
       await e.waitFor(e.element(e.by.id('id'))).toNotHaveLabel('value');
       await e.waitFor(e.element(e.by.id('id'))).toHaveValue('value');
       await e.waitFor(e.element(e.by.id('id'))).toNotHaveValue('value');
+      await e.waitFor(e.element(e.by.id('id'))).toBeFocused().withTimeout(0);
+      await e.waitFor(e.element(e.by.id('id'))).toBeNotFocused().withTimeout(0);
     });
 
     it(`waitFor (element) with wrong parameters should throw`, async () => {
@@ -231,6 +303,9 @@ describe('expectTwo API Coverage', () => {
       await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toExist().withTimeout(-1));
       await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement('notAMatcher'));
       await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).longPress('notANumber'));
+      await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).longPress(40, 40));
+      await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).longPress(40, { x: 43, y: 'notANumber' }));
+      await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).longPress(40, { x: 'notANumber', y: 43 }));
       await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).multiTap('notANumber'));
       await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).tapAtPoint('notAPoint'));
       await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).tapAtPoint({ notx: 1, y: 3 }));
@@ -242,6 +317,7 @@ describe('expectTwo API Coverage', () => {
       // await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).clearText());
       await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).scroll(50, 'notADirection', 0, 0));
       await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).scrollTo('notADirection'));
+      await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).performAccessibilityAction());
     });
 
     it(`waitFor....whileElement() actions`, async () => {
@@ -249,6 +325,9 @@ describe('expectTwo API Coverage', () => {
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).tap();
       await e.waitFor(e.element(e.by.id('id'))).not.toBeVisible().whileElement(e.by.id('id2')).tap();
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).longPress();
+      await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).longPress(20);
+      await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).longPress({ x: 15, y: 100 }, 20);
+      await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).longPress({ x: 15, y: 100 });
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).multiTap(2);
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).tapAtPoint({ x: 1, y: 1 });
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).tapBackspaceKey();
@@ -260,6 +339,7 @@ describe('expectTwo API Coverage', () => {
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).scroll(50, 'down');
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).scroll(50, 'down', 0, 0);
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).scrollTo('left');
+      await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).scrollTo('left', 0.1, 0.1);
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).swipe('left');
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).swipe('left', 'fast');
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).swipe('left', 'slow', 0.1);
@@ -267,6 +347,7 @@ describe('expectTwo API Coverage', () => {
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).setDatePickerDate('2019-2-8T05:10:00-08:00', 'yyyy-MM-dd\'T\'HH:mm:ssZZZZZ');
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).pinchWithAngle('outward', 'fast', 0);
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).pinch(1, 'fast', 0);
+      await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).performAccessibilityAction('activate');
     });
 
     it(`waitFor (element) with non-elements should throw`, async () => {
@@ -276,12 +357,8 @@ describe('expectTwo API Coverage', () => {
 });
 
 async function expectToThrow(func) {
-  try {
-    await func();
-    fail('should throw');
-  } catch (ex) {
-    expect(ex).toBeDefined();
-  }
+  const asyncWrapper = async () => await func();
+  await expect(asyncWrapper()).rejects.toThrow();
 }
 
 class MockExecutor {

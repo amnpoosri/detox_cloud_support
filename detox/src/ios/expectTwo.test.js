@@ -1,10 +1,12 @@
 // @ts-nocheck
+const jestExpect = require('expect').default; // eslint-disable-line
 const _ = require('lodash');
 
 describe('expectTwo', () => {
   let e;
   let emitter;
   let invocationManager;
+  let xcuitestRunner;
   let fs;
 
   beforeEach(() => {
@@ -16,15 +18,17 @@ describe('expectTwo', () => {
     const IosExpect = require('./expectTwo');
     const AsyncEmitter = jest.genMockFromModule('../utils/AsyncEmitter');
     invocationManager = new MockExecutor();
+    xcuitestRunner = new MockExecutor();
     emitter = new AsyncEmitter();
 
     e = new IosExpect({
       invocationManager,
+      xcuitestRunner,
       emitter,
     });
   });
 
-  it(`should produce correct JSON for tap action`, async () => {
+  it(`should parse correct JSON for tap action`, async () => {
     const testCall = await e.element(e.by.text('tapMe')).tap();
     const jsonOutput = {
       invocation: {
@@ -32,7 +36,8 @@ describe('expectTwo', () => {
         action: 'tap',
         predicate: {
           type: 'text',
-          value: 'tapMe'
+          value: 'tapMe',
+          isRegex: false,
         }
       }
     };
@@ -40,7 +45,24 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for tap action with parameters`, async () => {
+  it(`should parse correct JSON for RegExp text matcher`, async () => {
+    const testCall = await e.element(e.by.text(/tapMe/)).tap();
+    const jsonOutput = {
+      invocation: {
+        type: 'action',
+        action: 'tap',
+        predicate: {
+          type: 'text',
+          value: '/tapMe/',
+          isRegex: true,
+        }
+      }
+    };
+
+    expect(testCall).toDeepEqual(jsonOutput);
+  });
+
+  it(`should parse correct JSON for tap action with parameters`, async () => {
     const testCall = await e.element(e.by.text('tapMe')).tap({ x: 1, y: 2 });
     const jsonOutput = {
       invocation: {
@@ -54,7 +76,8 @@ describe('expectTwo', () => {
         ],
         predicate: {
           type: 'text',
-          value: 'tapMe'
+          value: 'tapMe',
+          isRegex: false,
         }
       }
     };
@@ -62,7 +85,7 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for element with id and text matchers`, async () => {
+  it(`should parse correct JSON for element with id and text matchers`, async () => {
     const testCall = await e.element(e.by.id('uniqueId').and(e.by.text('some text'))).tap();
     const jsonOutput = {
       invocation: {
@@ -73,11 +96,13 @@ describe('expectTwo', () => {
           predicates: [
             {
               type: 'id',
-              value: 'uniqueId'
+              value: 'uniqueId',
+              isRegex: false,
             },
             {
               type: 'text',
-              value: 'some text'
+              value: 'some text',
+              isRegex: false,
             }
           ]
         }
@@ -87,7 +112,34 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for element with ancestor matcher`, async () => {
+  it(`should parse correct JSON for element with RegExp id and text matchers`, async () => {
+    const testCall = await e.element(e.by.id(/uniqueId/).and(e.by.text(/some text/))).tap();
+    const jsonOutput = {
+      invocation: {
+        type: 'action',
+        action: 'tap',
+        predicate: {
+          type: 'and',
+          predicates: [
+            {
+              type: 'id',
+              value: '/uniqueId/',
+              isRegex: true,
+            },
+            {
+              type: 'text',
+              value: '/some text/',
+              isRegex: true,
+            }
+          ]
+        }
+      }
+    };
+
+    expect(testCall).toDeepEqual(jsonOutput);
+  });
+
+  it(`should parse correct JSON for element with ancestor matcher`, async () => {
     const testCall = await e.element(e.by.id('child').withAncestor(e.by.id('parent'))).tap();
     const jsonOutput = {
       invocation: {
@@ -98,16 +150,65 @@ describe('expectTwo', () => {
           predicates: [
             {
               type: 'id',
-              value: 'child'
+              value: 'child',
+              isRegex: false,
             },
             {
               type: 'ancestor',
               predicate: {
                 type: 'id',
-                value: 'parent'
+                value: 'parent',
+                isRegex: false,
               }
             }
           ]
+        }
+      }
+    };
+
+    expect(testCall).toDeepEqual(jsonOutput);
+  });
+
+  it(`should parse correct JSON for element with regex ancestor matcher`, async () => {
+    const testCall = await e.element(e.by.id('child').withAncestor(e.by.id(/parent/))).tap();
+    const jsonOutput = {
+      invocation: {
+        type: 'action',
+        action: 'tap',
+        predicate: {
+          type: 'and',
+          predicates: [
+            {
+              type: 'id',
+              value: 'child',
+              isRegex: false,
+            },
+            {
+              type: 'ancestor',
+              predicate: {
+                type: 'id',
+                value: '/parent/',
+                isRegex: true,
+              }
+            }
+          ]
+        }
+      }
+    };
+
+    expect(testCall).toDeepEqual(jsonOutput);
+  });
+
+  it(`should parse correct JSON for element with regex label`, async () => {
+    const testCall = await e.element(e.by.label(/tapMe/)).tap();
+    const jsonOutput = {
+      invocation: {
+        type: 'action',
+        action: 'tap',
+        predicate: {
+          type: 'label',
+          value: '/tapMe/',
+          isRegex: true,
         }
       }
     };
@@ -119,7 +220,7 @@ describe('expectTwo', () => {
     ['withAncestor'],
     ['withDescendant'],
     ['and'],
-  ])(`should produce immutable objects when combining matchers: %s`, async (combineMethodName) => {
+  ])(`should parse immutable objects when combining matchers: %s`, async (combineMethodName) => {
     const base = e.by.id('abc');
     const modifier = e.by.id('def');
 
@@ -128,7 +229,7 @@ describe('expectTwo', () => {
     expect(modifier).toEqual(e.by.id('def'));
   });
 
-  it(`should produce correct JSON for element with ancestor and index matchers`, async () => {
+  it(`should parse correct JSON for element with ancestor and index matchers`, async () => {
     const testCall = await e.element(e.by.id('child').withAncestor(e.by.id('parent'))).atIndex(0).tap();
     const jsonOutput = {
       invocation: {
@@ -140,13 +241,15 @@ describe('expectTwo', () => {
           predicates: [
             {
               type: 'id',
-              value: 'child'
+              value: 'child',
+              isRegex: false,
             },
             {
               type: 'ancestor',
               predicate: {
                 type: 'id',
-                value: 'parent'
+                value: 'parent',
+                isRegex: false,
               }
             }
           ]
@@ -156,7 +259,7 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for element with ancestor and test matchers`, async () => {
+  it(`should parse correct JSON for element with ancestor and test matchers`, async () => {
     const testCall = await e.element(e.by.id('child').withAncestor(e.by.id('parent').and(e.by.text('text')))).tap();
     const jsonOutput = {
       invocation: {
@@ -167,7 +270,8 @@ describe('expectTwo', () => {
           predicates: [
             {
               type: 'id',
-              value: 'child'
+              value: 'child',
+              isRegex: false,
             },
             {
               type: 'ancestor',
@@ -176,11 +280,13 @@ describe('expectTwo', () => {
                 predicates: [
                   {
                     type: 'id',
-                    value: 'parent'
+                    value: 'parent',
+                    isRegex: false,
                   },
                   {
                     type: 'text',
-                    value: 'text'
+                    value: 'text',
+                    isRegex: false,
                   }
                 ]
               }
@@ -193,7 +299,7 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for element with id, text and value matchers`, async () => {
+  it(`should parse correct JSON for element with id, text and value matchers`, async () => {
     const testCall = await e.element(e.by.id('child').and(e.by.text('text').and(e.by.value('value')))).tap();
     const jsonOutput = {
       invocation: {
@@ -204,15 +310,17 @@ describe('expectTwo', () => {
           predicates: [
             {
               type: 'id',
-              value: 'child'
+              value: 'child',
+              isRegex: false,
             },
             {
               type: 'text',
-              value: 'text'
+              value: 'text',
+              isRegex: false,
             },
             {
               type: 'value',
-              value: 'value'
+              value: 'value',
             }
           ]
         }
@@ -222,7 +330,7 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for tap at point action`, async () => {
+  it(`should parse correct JSON for tap at point action`, async () => {
     const testCall = await e.element(e.by.id('tappable')).tapAtPoint({ x: 5, y: 10 });
     const jsonOutput = {
       invocation: {
@@ -236,7 +344,8 @@ describe('expectTwo', () => {
         ],
         predicate: {
           type: 'id',
-          value: 'tappable'
+          value: 'tappable',
+          isRegex: false,
         }
       }
     };
@@ -244,7 +353,7 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for long-press and drag action`, async () => {
+  it(`should parse correct JSON for long-press and drag action`, async () => {
     const testCall = await e.element(e.by.id('elementToDrag')).longPressAndDrag(1000, 0.5, 0.5, e.element(e.by.id('targetElement')));
     const jsonOutput = {
       invocation: {
@@ -253,12 +362,14 @@ describe('expectTwo', () => {
         params: [1000, 0.5, 0.5, null, null, 'fast', 1000],
         predicate: {
           type: 'id',
-          value: 'elementToDrag'
+          value: 'elementToDrag',
+          isRegex: false,
         },
         targetElement: {
           predicate: {
             type: 'id',
-            value: 'targetElement'
+            value: 'targetElement',
+            isRegex: false,
           }
         }
       }
@@ -266,14 +377,15 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for visibility expectation`, async () => {
+  it(`should parse correct JSON for visibility expectation`, async () => {
     const testCall = await e.expect(e.element(e.by.text('Tap Working!!!'))).toBeVisible();
     const jsonOutput = {
       invocation: {
         type: 'expectation',
         predicate: {
           type: 'text',
-          value: 'Tap Working!!!'
+          value: 'Tap Working!!!',
+          isRegex: false,
         },
         expectation: 'toBeVisible'
       }
@@ -282,14 +394,15 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for toBeVisible expectation with parameter`, async () => {
+  it(`should parse correct JSON for toBeVisible expectation with parameter`, async () => {
     const testCall = await e.expect(e.element(e.by.id('foo'))).toBeVisible(25);
     const jsonOutput = {
       invocation: {
         type: 'expectation',
         predicate: {
           type: 'id',
-          value: 'foo'
+          value: 'foo',
+          isRegex: false,
         },
         expectation: 'toBeVisible',
         params: [25]
@@ -299,14 +412,15 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for toBeNotVisible expectation`, async () => {
+  it(`should parse correct JSON for toBeNotVisible expectation`, async () => {
     const testCall = await e.expect(e.element(e.by.text('Tap Working!!!'))).toBeNotVisible();
     const jsonOutput = {
       invocation: {
         type: 'expectation',
         predicate: {
           type: 'text',
-          value: 'Tap Working!!!'
+          value: 'Tap Working!!!',
+          isRegex: false,
         },
         modifiers: ['not'],
         expectation: 'toBeVisible'
@@ -316,14 +430,15 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for toBeFocused expectation`, async () => {
+  it(`should parse correct JSON for toBeFocused expectation`, async () => {
     const testCall = await e.expect(e.element(e.by.text('Tap Working!!!'))).toBeFocused();
     const jsonOutput = {
       invocation: {
         type: 'expectation',
         predicate: {
           type: 'text',
-          value: 'Tap Working!!!'
+          value: 'Tap Working!!!',
+          isRegex: false,
         },
         expectation: 'toBeFocused'
       }
@@ -332,14 +447,15 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for notToBeFocused expectation`, async () => {
+  it(`should parse correct JSON for notToBeFocused expectation`, async () => {
     const testCall = await e.expect(e.element(e.by.text('Tap Working!!!'))).toBeNotFocused();
     const jsonOutput = {
       invocation: {
         type: 'expectation',
         predicate: {
           type: 'text',
-          value: 'Tap Working!!!'
+          value: 'Tap Working!!!',
+          isRegex: false,
         },
         modifiers: ['not'],
         expectation: 'toBeFocused'
@@ -349,14 +465,15 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for toHaveText expectation`, async () => {
+  it(`should parse correct JSON for toHaveText expectation`, async () => {
     const testCall = await e.expect(e.element(e.by.id('UniqueId204'))).toHaveText('I contain some text');
     const jsonOutput = {
       invocation: {
         type: 'expectation',
         predicate: {
           type: 'id',
-          value: 'UniqueId204'
+          value: 'UniqueId204',
+          isRegex: false,
         },
         expectation: 'toHaveText',
         params: ['I contain some text']
@@ -366,7 +483,7 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for toHaveId expectation`, async () => {
+  it(`should parse correct JSON for toHaveId expectation`, async () => {
     const testCall = await e.expect(e.element(e.by.text('Product')).atIndex(2)).toHaveId('ProductId002');
     const jsonOutput = {
       'invocation': {
@@ -374,7 +491,8 @@ describe('expectTwo', () => {
         'atIndex': 2,
         'predicate': {
           'type': 'text',
-          'value': 'Product'
+          'value': 'Product',
+          'isRegex': false,
         },
         'expectation': 'toHaveId',
         'params': ['ProductId002']
@@ -384,14 +502,15 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for toHaveSliderPosition expectation`, async () => {
+  it(`should parse correct JSON for toHaveSliderPosition expectation`, async () => {
     const testCall = await e.expect(e.element(e.by.id('slider'))).toHaveSliderPosition(0.5, 1);
     const jsonOutput = {
       'invocation': {
         'type': 'expectation',
         'predicate': {
           'type': 'id',
-          'value': 'slider'
+          'value': 'slider',
+          'isRegex': false,
         },
         'expectation': 'toHaveSliderPosition',
         'params': [0.5, 1]
@@ -401,14 +520,15 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for toHaveToggleValue expectation`, async () => {
+  it(`should parse correct JSON for toHaveToggleValue expectation`, async () => {
     const testCall = await e.expect(e.element(e.by.id('switch'))).toHaveToggleValue(true);
     const jsonOutput = {
       'invocation': {
         'type': 'expectation',
         'predicate': {
           'type': 'id',
-          'value': 'switch'
+          'value': 'switch',
+          'isRegex': false,
         },
         'expectation': 'toHaveValue',
         'params': ['1']
@@ -418,7 +538,7 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it(`should produce correct JSON for swipe action`, async () => {
+  it(`should parse correct JSON for swipe action`, async () => {
     const testCall = await e.element(e.by.id('ScrollView100')).swipe('up', 'fast', undefined, undefined, 0.5);
     const jsonOutput = {
       invocation: {
@@ -427,7 +547,8 @@ describe('expectTwo', () => {
         params: ['up', 'fast', 0.75, null, 0.5],
         predicate: {
           type: 'id',
-          value: 'ScrollView100'
+          value: 'ScrollView100',
+          isRegex: false,
         }
       }
     };
@@ -435,8 +556,36 @@ describe('expectTwo', () => {
     expect(testCall).toDeepEqual(jsonOutput);
   });
 
+  it(`should trim milliseconds for setDatePickerDate with ISO8601 format`, async () => {
+    const testCall = await e.element(e.by.id('datePicker')).setDatePickerDate('2019-01-01T00:00:00.000Z', 'ISO8601');
+    const jsonOutput = {
+      'invocation': {
+        'type': 'action',
+        'action': 'setDatePickerDate',
+        'params': ['2019-01-01T00:00:00Z', 'ISO8601'],
+        'predicate': { 'type': 'id', 'value': 'datePicker', 'isRegex': false }
+      }
+    };
+
+    expect(testCall).toDeepEqual(jsonOutput);
+  });
+
+  it(`should not trim milliseconds for setDatePickerDate with a custom format`, async () => {
+    const testCall = await e.element(e.by.id('datePicker')).setDatePickerDate('2019-01-01T00:00:00.000Z', 'YYYY-MM-DDTHH:mm:sss.fT');
+    const jsonOutput = {
+      'invocation': {
+        'type': 'action',
+        'action': 'setDatePickerDate',
+        'params': ['2019-01-01T00:00:00.000Z', 'YYYY-MM-DDTHH:mm:sss.fT'],
+        'predicate': { 'type': 'id', 'value': 'datePicker', 'isRegex': false }
+      }
+    };
+
+    expect(testCall).toDeepEqual(jsonOutput);
+  });
+
   describe(`waitFor`, () => {
-    it(`should produce correct JSON for toBeNotVisible expectation`, async () => {
+    it(`should parse correct JSON for toBeNotVisible expectation`, async () => {
       const testCall = await e.waitFor(e.element(e.by.text('Text5'))).toBeNotVisible().whileElement(e.by.id('ScrollView630')).scroll(50, 'down');
       const jsonOutput = {
         invocation: {
@@ -445,13 +594,15 @@ describe('expectTwo', () => {
           params: [50, 'down', null, null],
           predicate: {
             type: 'id',
-            value: 'ScrollView630'
+            value: 'ScrollView630',
+            isRegex: false,
           },
           while: {
             type: 'expectation',
             predicate: {
               type: 'text',
-              value: 'Text5'
+              value: 'Text5',
+              isRegex: false,
             },
             modifiers: ['not'],
             expectation: 'toBeVisible'
@@ -462,51 +613,54 @@ describe('expectTwo', () => {
       expect(testCall).toDeepEqual(jsonOutput);
     });
 
-    it(`should produce correct JSON for toExist expectation`, async () => {
+    it(`should parse correct JSON for toExist expectation`, async () => {
       const testCall = await e.waitFor(e.element(e.by.id('createdAndVisibleText'))).toExist().withTimeout(2000);
       const jsonOutput = {
         invocation:
-          {
-            type: 'expectation',
-            predicate: {
-              type: 'id',
-              value: 'createdAndVisibleText'
-            },
-            expectation: 'toExist',
-            timeout: 2000
-          }
+            {
+              type: 'expectation',
+              predicate: {
+                type: 'id',
+                value: 'createdAndVisibleText',
+                isRegex: false,
+              },
+              expectation: 'toExist',
+              timeout: 2000
+            }
       };
 
       expect(testCall).toDeepEqual(jsonOutput);
     });
 
-    it(`should produce correct JSON for text and index matchers`, async () => {
+    it(`should parse correct JSON for text and index matchers`, async () => {
       const testCall = await e.waitFor(e.element(e.by.text('Item')).atIndex(1)).toExist().withTimeout(2000);
       const jsonOutput = {
         invocation:
-          {
-            type: 'expectation',
-            atIndex: 1,
-            predicate: {
-              type: 'text',
-              value: 'Item'
-            },
-            expectation: 'toExist',
-            timeout: 2000
-          }
+            {
+              type: 'expectation',
+              atIndex: 1,
+              predicate: {
+                type: 'text',
+                value: 'Item',
+                isRegex: false,
+              },
+              expectation: 'toExist',
+              timeout: 2000
+            }
       };
 
       expect(testCall).toDeepEqual(jsonOutput);
     });
 
-    it(`should produce correct JSON for toBeNotVisible expectation`, async () => {
+    it(`should parse correct JSON for toBeNotVisible expectation`, async () => {
       const testCall = await e.waitFor(e.element(e.by.id('uniqueId'))).not.toBeVisible().withTimeout(2000);
       const jsonOutput = {
         invocation: {
           type: 'expectation',
           predicate: {
             type: 'id',
-            value: 'uniqueId'
+            value: 'uniqueId',
+            isRegex: false,
           },
           modifiers: ['not'],
           expectation: 'toBeVisible',
@@ -546,6 +700,7 @@ describe('expectTwo', () => {
         action: 'takeScreenshot',
         ...(imageName && { params: [imageName] }),
         predicate: {
+          isRegex: false,
           type: 'id',
           value: 'uniqueId'
         }
@@ -569,16 +724,455 @@ describe('expectTwo', () => {
     });
   });
 
-  it('by.web should throw', async () => {
-    expect(() => e.by.web).toThrowError(/not support/);
+  it('toBeVisible() should throw with bad args', async () => {
+    const stubMatcher = e.element(e.by.label('test'));
+    const expectedErrorMsg = 'must be an integer between 1 and 100';
+
+    jestExpect(() => e.expect(stubMatcher).toBeVisible(0)).toThrow(expectedErrorMsg);
+    jestExpect(() => e.expect(stubMatcher).not.toBeVisible(0)).toThrow(expectedErrorMsg);
+    jestExpect(() => e.expect(stubMatcher).toBeVisible(101)).toThrow(expectedErrorMsg);
+    jestExpect(() => e.expect(stubMatcher).not.toBeVisible(101)).toThrow(expectedErrorMsg);
+
+    jestExpect(() => e.waitFor(stubMatcher).toBeVisible(0)).toThrow(expectedErrorMsg);
+    jestExpect(() => e.waitFor(stubMatcher).toBeVisible(101)).toThrow(expectedErrorMsg);
   });
 
-  it('web() should throw', async () => {
-    expect(() => e.web(e.by.id('someId'))).toThrowError(/not support/);
+  it(`element(e.by.text('tapMe')).performAccessibilityAction('activate')`, async () => {
+    const testCall = await e.element(e.by.text('tapMe')).performAccessibilityAction('activate');
+    const jsonOutput = {
+      invocation: {
+        type: 'action',
+        action: 'accessibilityAction',
+        predicate: {
+          type: 'text',
+          value: 'tapMe',
+          isRegex: false,
+        },
+        params: [
+          'activate'
+        ]
+      }
+    };
+
+    expect(testCall).toDeepEqual(jsonOutput);
   });
 
-  it('web.element() should throw', async () => {
-    expect(() => e.web.element(e.by.id('someId'))).toThrowError(/not support/);
+  describe('system', () => {
+    it(`should parse system.element(by.system.label('tapMe')).atIndex(1).tap()`, async () => {
+      const testCall = await e.system.element(e.by.system.label('tapMe')).atIndex(1).tap();
+      const jsonOutput = {
+        invocation: {
+          type: 'systemAction',
+          systemAction: 'tap',
+          systemPredicate: {
+            type: 'label',
+            value: 'tapMe'
+          },
+          systemAtIndex: 1
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse expect(system.element(by.system.type('button'))).not.toExist()`, async () => {
+      const testCall = await e.expect(e.system.element(e.by.system.type('button'))).not.toExist();
+      const jsonOutput = {
+        invocation: {
+          type: 'systemExpectation',
+          systemExpectation: 'toExist',
+          systemModifiers: ['not'],
+          systemPredicate: {
+            type: 'type',
+            value: 'button'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+  });
+
+  describe('web views', () => {
+    it(`should parse expect(web(by.id('webViewId').element(web(by.label('tapMe')))).toExist()`, async () => {
+      const testCall = await e.expect(e.web(e.by.id('webViewId')).atIndex(1).element(e.by.web.label('tapMe')).atIndex(2)).toExist();
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webExpectation',
+          webExpectation: 'toExist',
+          predicate: {
+            type: 'id',
+            value: 'webViewId',
+            isRegex: false
+          },
+          atIndex: 1,
+          webPredicate: {
+            type: 'label',
+            value: 'tapMe'
+          },
+          webAtIndex: 2
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web(by.id('webViewId').element(web(by.label('tapMe')))).not.toHaveText('Hey')`, async () => {
+      const testCall = await e.expect(e.web(e.by.id('webViewId')).element(e.by.web.label('tapMe'))).not.toHaveText('Hey');
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webExpectation',
+          webExpectation: 'toHaveText',
+          params: ['Hey'],
+          predicate: {
+            type: 'id',
+            value: 'webViewId',
+            isRegex: false
+          },
+          webModifiers: ['not'],
+          webPredicate: {
+            type: 'label',
+            value: 'tapMe'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it('should throw when passing non-web-element matcher to element()', async () => {
+      const expectedErrorMsg = 'is not a Detox web-view matcher';
+
+      jestExpect(() => e.expect(
+          e.web(e.by.id('webViewId')).element(e.by.label('tapMe'))
+      ).toExist()).toThrow(expectedErrorMsg);
+    });
+
+    it('should throw when not passing matcher to web()', async () => {
+      const expectedErrorMsg = 'invalid is not a Detox matcher';
+      jestExpect(() => e.web('invalid').element(e.by.label('tapMe')).toExist()).toThrow(expectedErrorMsg);
+    });
+
+    it('should throw when passing at-index to a non-matcher', async () => {
+      const expectedErrorMsg = 'cannot apply atIndex to a non-matcher';
+      jestExpect(() => e.web('invalid').atIndex(1).element(e.by.web.label('tapMe')).toExist()).toThrow(expectedErrorMsg);
+    });
+
+    it(`should parse web(by.id('webViewId')).atIndex(2).element(web.by.label('tapMe')).atIndex(1).clearText()`, async () => {
+      const testCall =
+          await e.web(e.by.id('webViewId')).atIndex(2).element(e.by.web.label('tapMe')).atIndex(1).clearText();
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'clearText',
+          webAtIndex: 1,
+          predicate: {
+            type: 'id',
+            value: 'webViewId',
+            isRegex: false
+          },
+          atIndex: 2,
+          webPredicate: {
+            type: 'label',
+            value: 'tapMe'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it('should raise on invalid at-index', async () => {
+      const expectedErrorMsg = 'index should be an integer, got -1 (number)';
+      jestExpect(() => e.web(e.by.id('webViewId')).atIndex(-1).element(e.by.web.label('tapMe')).atIndex(1).clearText()).toThrow(expectedErrorMsg);
+    });
+
+    it('should raise on invalid web-matcher at-index', async () => {
+      const expectedErrorMsg = 'index should be an integer, got -1 (number)';
+      jestExpect(() => e.web(e.by.id('webViewId')).element(e.by.web.label('tapMe')).atIndex(-1).clearText()).toThrow(expectedErrorMsg);
+    });
+
+    it(`should parse web.element(by.web.label('tapMe')).tap()`, async () => {
+      const testCall = await e.web.element(e.by.web.label('tapMe')).tap();
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'tap',
+          webPredicate: {
+            type: 'label',
+            value: 'tapMe'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.id('someValue')).typeText('text')`, async () => {
+      const testCall = await e.web.element(e.by.web.id('someValue')).atIndex(3).typeText('text');
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'typeText',
+          webAtIndex: 3,
+          params: ['text'],
+          webPredicate: {
+            type: 'id',
+            value: 'someValue'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.id('someValue')).typeText('text', true)`, async () => {
+      const testCall = await e.web.element(e.by.web.id('someValue')).atIndex(3).typeText('text', true);
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'typeText',
+          webAtIndex: 3,
+          params: ['text'],
+          webPredicate: {
+            type: 'id',
+            value: 'someValue'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.className('someValue')).replaceText('text')`, async () => {
+      const testCall = await e.web.element(e.by.web.className('someValue')).replaceText('text');
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'replaceText',
+          params: ['text'],
+          webPredicate: {
+            type: 'class',
+            value: 'someValue'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.cssSelector('someValue')).focus()`, async () => {
+      const testCall = await e.web.element(e.by.web.cssSelector('someValue')).focus();
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'focus',
+          webPredicate: {
+            type: 'css',
+            value: 'someValue'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.xpath('someValue')).getCurrentUrl()`, async () => {
+      const testCall = await e.web.element(e.by.web.xpath('someValue')).getCurrentUrl();
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'getCurrentUrl',
+          webPredicate: {
+            type: 'xpath',
+            value: 'someValue'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.name('someValue')).getText()`, async () => {
+      const testCall = await e.web.element(e.by.web.name('someValue')).getText();
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'getText',
+          webPredicate: {
+            type: 'name',
+            value: 'someValue'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.href('someValue')).getTitle()`, async () => {
+      const testCall = await e.web.element(e.by.web.href('someValue')).getTitle();
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'getTitle',
+          webPredicate: {
+            type: 'href',
+            value: 'someValue'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.hrefContains('someValue')).moveCursorToEnd()`, async () => {
+      const testCall = await e.web.element(e.by.web.hrefContains('someValue')).moveCursorToEnd();
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'moveCursorToEnd',
+          webPredicate: {
+            type: 'hrefContains',
+            value: 'someValue'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.tag('someValue')).runScript('script')`, async () => {
+      const testCall = await e.web.element(e.by.web.tag('someValue')).runScript('script');
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'runScript',
+          params: ['script'],
+          webPredicate: {
+            type: 'tag',
+            value: 'someValue'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.value('someValue')).runScript(() => {}, ['arg'])`, async () => {
+      const testCall = await e.web.element(e.by.web.value('someValue')).runScript(() => {}, ['arg']);
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'runScriptWithArgs',
+          params: ['() => {}', ['arg']],
+          webPredicate: {
+            type: 'value',
+            value: 'someValue'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.value('someValue')).runScript('() => {}', ['arg'])`, async () => {
+      const testCall = await e.web.element(e.by.web.value('someValue')).runScript('() => {}', ['arg']);
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'runScriptWithArgs',
+          params: ['() => {}', ['arg']],
+          webPredicate: {
+            type: 'value',
+            value: 'someValue'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.name('someValue')).selectAllText()`, async () => {
+      const testCall = await e.web.element(e.by.web.name('someValue')).selectAllText();
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'selectAllText',
+          webPredicate: {
+            type: 'name',
+            value: 'someValue'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it(`should parse web.element(by.web.id('webViewId')).scrollToView()`, async () => {
+      const testCall = await e.web.element(e.by.web.id('webViewId')).scrollToView();
+
+      const jsonOutput = {
+        invocation: {
+          type: 'webAction',
+          webAction: 'scrollToView',
+          webPredicate: {
+            type: 'id',
+            value: 'webViewId'
+          }
+        }
+      };
+
+      expect(testCall).toDeepEqual(jsonOutput);
+    });
+
+    it('should throw when invocation returns an error', async () => {
+      invocationManager.execute.mockResolvedValueOnce({
+        error: 'some error'
+      });
+
+      await expect(() => e.web.element(e.by.web.id('uniqueId')).getTitle()).rejects.toThrow('some error');
+    });
+
+    it('should extract return value (`return`) when exists on getter', async () => {
+      invocationManager.execute.mockResolvedValueOnce({
+        result: 'some result'
+      });
+
+      const result = await e.web.element(e.by.web.id('uniqueId')).getTitle();
+      expect(result).toBe('some result');
+    });
+
+    it('should extract return value (`title`) when exists on getter', async () => {
+      invocationManager.execute.mockResolvedValueOnce({
+        title: 'some result'
+      });
+
+      const result = await e.web.element(e.by.web.id('uniqueId')).getTitle();
+      expect(result).toBe('some result');
+    });
+
+    it('should return undefined value when no return value exists and undefined allowed', async () => {
+      invocationManager.execute.mockResolvedValueOnce({});
+
+      const result = await e.web.element(e.by.web.id('uniqueId')).runScript(() => {});
+      expect(result).toBe(undefined);
+    });
   });
 });
 

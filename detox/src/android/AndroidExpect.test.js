@@ -1,4 +1,5 @@
 // @ts-nocheck
+
 describe('AndroidExpect', () => {
   let e;
 
@@ -40,12 +41,21 @@ describe('AndroidExpect', () => {
       await e.expect(e.element(e.by.accessibilityLabel('test'))).toHaveText('text');
       await e.expect(e.element(e.by.accessibilityLabel('test'))).toNotHaveText('text');
       await e.expect(e.element(e.by.accessibilityLabel('test'))).not.toHaveText('text');
+      await e.expect(e.element(e.by.accessibilityLabel('test'))).toHaveText(/text/);
+      await e.expect(e.element(e.by.accessibilityLabel('test'))).toNotHaveText(/text/);
+      await e.expect(e.element(e.by.accessibilityLabel('test'))).not.toHaveText(/text/);
       await e.expect(e.element(e.by.accessibilityLabel('test'))).toHaveLabel('label');
       await e.expect(e.element(e.by.accessibilityLabel('test'))).toNotHaveLabel('label');
       await e.expect(e.element(e.by.accessibilityLabel('test'))).not.toHaveLabel('label');
+      await e.expect(e.element(e.by.accessibilityLabel(/test/))).toHaveLabel(/label/);
+      await e.expect(e.element(e.by.accessibilityLabel(/test/))).toNotHaveLabel(/label/);
+      await e.expect(e.element(e.by.accessibilityLabel(/test/))).not.toHaveLabel(/label/);
       await e.expect(e.element(e.by.accessibilityLabel('test'))).toHaveId('id');
       await e.expect(e.element(e.by.accessibilityLabel('test'))).toNotHaveId('id');
       await e.expect(e.element(e.by.accessibilityLabel('test'))).not.toHaveId('id');
+      await e.expect(e.element(e.by.accessibilityLabel('test'))).toHaveId(/id/);
+      await e.expect(e.element(e.by.accessibilityLabel('test'))).toNotHaveId(/id/);
+      await e.expect(e.element(e.by.accessibilityLabel('test'))).not.toHaveId(/id/);
       await e.expect(e.element(e.by.accessibilityLabel('test'))).toHaveValue('value');
       await e.expect(e.element(e.by.accessibilityLabel('test'))).toNotHaveValue('value');
       await e.expect(e.element(e.by.accessibilityLabel('test'))).not.toHaveValue('value');
@@ -107,30 +117,37 @@ describe('AndroidExpect', () => {
     });
 
     it(`should throw for invalid toBeVisible parameters`, async () => {
-      await expectToThrow(() =>e.expect(e.element(e.by.label('test'))).toBeVisible(0));
-      await expectToThrow(() =>e.expect(e.element(e.by.label('test'))).toBeVisible(120));
-      await expectToThrow(() =>e.waitFor(e.element(e.by.label('test'))).toBeVisible(0));
-      await expectToThrow(() =>e.e.waitFor(e.element(e.by.label('test'))).toBeVisible(120));
+      const stubMatcher = e.element(e.by.label('test'));
+      const expectedErrorMsg = 'must be an integer between 1 and 100';
+
+      await expect(() => e.expect(stubMatcher).toBeVisible(0)).rejects.toThrow(expectedErrorMsg);
+      await expect(() => e.expect(stubMatcher).not.toBeVisible(0)).rejects.toThrow(expectedErrorMsg);
+      await expect(() => e.expect(stubMatcher).toBeVisible(101)).rejects.toThrow(expectedErrorMsg);
+      await expect(() => e.expect(stubMatcher).not.toBeVisible(101)).rejects.toThrow(expectedErrorMsg);
+
+      expect(() => e.waitFor(stubMatcher).toBeVisible(0)).toThrow(expectedErrorMsg);
+      expect(() => e.waitFor(stubMatcher).toBeVisible(101)).toThrow(expectedErrorMsg);
     });
 
     it(`expect with wrong parameters should throw`, async () => {
-      await expectToThrow(() => e.expect('notAnElement'));
-      await expectToThrow(() => e.expect(e.element('notAMatcher')));
+      expect(() => e.expect('notAnElement')).toThrow();
+      expect(() => e.expect(e.element('notAMatcher'))).toThrow();
     });
 
     it(`matchers with wrong parameters should throw`, async () => {
-      await expectToThrow(() => e.element(e.by.label(5)));
-      await expectToThrow(() => e.element(e.by.accessibilityLabel(5)));
-      await expectToThrow(() => e.element(e.by.id(5)));
-      await expectToThrow(() => e.element(e.by.type(0)));
-      await expectToThrow(() => e.by.traits(1));
-      await expectToThrow(() => e.by.traits(['nonExistentTrait']));
-      await expectToThrow(() => e.element(e.by.value(0)));
-      await expectToThrow(() => e.element(e.by.text(0)));
-      await expectToThrow(() => e.element(e.by.id('test').withAncestor('notAMatcher')));
-      await expectToThrow(() => e.element(e.by.id('test').withDescendant('notAMatcher')));
-      await expectToThrow(() => e.element(e.by.id('test').and('notAMatcher')));
-      await expectToThrow(() => e.element(e.by.id('test').or('notAMatcher')));
+      expect(() => e.by.label(5)).toThrow();
+      expect(() => e.by.accessibilityLabel(5)).toThrow();
+      expect(() => e.by.id(5)).toThrow();
+      expect(() => e.by.type(0)).toThrow();
+      expect(() => e.by.traits(1)).toThrow();
+      expect(() => e.by.value(0)).toThrow();
+      expect(() => e.by.text(0)).toThrow();
+
+      const expectedErrorMsg = 'Expected a matcher, got: \'notAMatcher\'';
+      expect(() => e.element(e.by.id('test').withAncestor('notAMatcher'))).toThrow(expectedErrorMsg);
+      expect(() => e.element(e.by.id('test').withDescendant('notAMatcher'))).toThrow(expectedErrorMsg);
+      expect(() => e.element(e.by.id('test').and('notAMatcher'))).toThrow(expectedErrorMsg);
+      expect(() => e.element(e.by.id('test').or('notAMatcher'))).toThrow(expectedErrorMsg);
     });
 
     it(`waitFor (element)`, async () => {
@@ -165,17 +182,20 @@ describe('AndroidExpect', () => {
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).scroll(50, 'down');
       await e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement(e.by.id('id2')).scroll(50);
 
+      await e.waitFor(e.element(e.by.id('id'))).toBeFocused().withTimeout(0);
+      await e.waitFor(e.element(e.by.id('id'))).toBeNotFocused().withTimeout(0);
     });
 
     it(`waitFor (element) with wrong parameters should throw`, async () => {
-      await expectToThrow(() => e.waitFor('notAnElement'));
-      await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toExist().withTimeout('notANumber'));
-      await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toExist().withTimeout(-1));
-      await expectToThrow(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement('notAnElement'));
+      expect(() => e.waitFor('notAnElement')).toThrow();
+      expect(() => e.waitFor(e.element(e.by.id('id'))).toBeVisible().whileElement('notAnElement')).toThrow();
+
+      await expect(() => e.waitFor(e.element(e.by.id('id'))).toExist().withTimeout('notANumber')).rejects.toThrow();
+      await expect(() => e.waitFor(e.element(e.by.id('id'))).toExist().withTimeout(-1)).rejects.toThrow();
     });
 
     it(`waitFor (element) with non-elements should throw`, async () => {
-      await expectToThrow(() => e.waitFor('notAnElement').toBeVisible());
+      expect(() => e.waitFor('notAnElement')).toThrow();
     });
 
     it('toHaveSliderPosition', async () => {
@@ -191,13 +211,21 @@ describe('AndroidExpect', () => {
         await e.element(e.by.label('Tap Me')).tap({ x: 10, y: 10 });
         await e.element(e.by.label('Tap Me')).tapAtPoint({ x: 100, y: 200 });
         await e.element(e.by.label('Tap Me')).longPress();
+        await e.element(e.by.label('Tap Me')).longPress(1000);
+        await e.element(e.by.label('Tap Me')).longPress({ x: 10, y: 10 }, 1000);
+        await e.element(e.by.label('Tap Me')).longPress({ x: 10, y: 10 });
         await e.element(e.by.id('UniqueId819')).multiTap(3);
       });
 
       it('should not tap and long-press given bad args', async () => {
         await [null, undefined, 0, -1, 'NaN'].forEach(item => {
-          expectToThrow(() => e.element(e.by.id('UniqueId819')).multiTap(item));
+          expect(() => e.element(e.by.id('UniqueId819')).multiTap(item)).rejects.toThrow();
         });
+
+        await expect(() => e.element(e.by.label('Tap Me')).longPress('NaN')).rejects.toThrow();
+        await expect(() => e.element(e.by.label('Tap Me')).longPress('NaN', 1000)).rejects.toThrow();
+        await expect(() => e.element(e.by.label('Tap Me')).longPress({ x: 'NaN', y: 10 }, 1000)).rejects.toThrow();
+        await expect(() => e.element(e.by.label('Tap Me')).longPress({ x: 10, y: 'NaN' }, 1000)).rejects.toThrow();
       });
 
       it('should press special keys', async () => {
@@ -212,8 +240,8 @@ describe('AndroidExpect', () => {
       });
 
       it('should not edit text given bad args', async () => {
-        await expectToThrow(() => e.element(e.by.id('UniqueId937')).typeText(0));
-        await expectToThrow(() => e.element(e.by.id('UniqueId005')).replaceText(3));
+        await expect(() => e.element(e.by.id('UniqueId937')).typeText(0)).rejects.toThrow();
+        await expect(() => e.element(e.by.id('UniqueId005')).replaceText(3)).rejects.toThrow();
       });
 
       it('should scroll', async () => {
@@ -230,11 +258,22 @@ describe('AndroidExpect', () => {
       });
 
       it('should not scroll given bad args', async () => {
-        await expectToThrow(() => e.element(e.by.id('ScrollView161')).scroll('NaN', 'down'));
-        await expectToThrow(() => e.element(e.by.id('ScrollView161')).scroll(100, 'noDirection'));
-        await expectToThrow(() => e.element(e.by.id('ScrollView161')).scroll(100, 0));
-        await expectToThrow(() => e.element(e.by.id('ScrollView161')).scrollTo(0));
-        await expectToThrow(() => e.element(e.by.id('ScrollView161')).scrollTo('noDirection'));
+        await expect(() => e.element(e.by.id('ScrollView161')).scroll('NaN', 'down')).rejects.toThrow();
+        await expect(() => e.element(e.by.id('ScrollView161')).scroll(100, 'noDirection')).rejects.toThrow();
+        await expect(() => e.element(e.by.id('ScrollView161')).scroll(100, 0)).rejects.toThrow();
+        await expect(() => e.element(e.by.id('ScrollView161')).scrollTo(0)).rejects.toThrow();
+        await expect(() => e.element(e.by.id('ScrollView161')).scrollTo('noDirection')).rejects.toThrow();
+      });
+
+      it('should setDatePickerDate', async () => {
+        await e.element(e.by.type('android.widget.DatePicker')).setDatePickerDate('2019-02-06T05:10:00-08:00', 'ISO8601');
+        await e.element(e.by.type('android.widget.DatePicker')).setDatePickerDate('2019/02/06', 'YYYY/MM/DD');
+        await e.element(e.by.type('android.widget.DatePicker')).setDatePickerDate('2019-02-06', 'YYYY-MM-DD');
+      });
+
+      it('should not setDatePickerDate given bad args', async () => {
+        await expect(() => e.element(e.by.type('android.widget.DatePicker')).setDatePickerDate('2019-02-06T05:10:00-08:00')).rejects.toThrow();
+        await expect(() => e.element(e.by.type('android.widget.DatePicker')).setDatePickerDate(2019, 'ISO8601')).rejects.toThrow();
       });
 
       it('should swipe', async () => {
@@ -251,12 +290,17 @@ describe('AndroidExpect', () => {
         await e.element(e.by.id('ScrollView799')).swipe('up', 'slow', 0.9, 0.5, 0.5);
       });
 
+      it('should long press and drag', async () => {
+        await e.element(e.by.id('draggable')).longPressAndDrag(1000, 0.5, 0.5, e.element(e.by.id('DragAndDropTarget')), 0.5, 0.5, 'fast', 0);
+        await e.element(e.by.id('draggable')).longPressAndDrag(1000, 0.5, 0.5, e.element(e.by.id('DragAndDropTarget')), 0.5, 0.5, 'slow', 0);
+      });
+
       it('should not swipe given bad args', async () => {
-        await expectToThrow(() => e.element(e.by.id('ScrollView799')).swipe(4, 'fast'));
-        await expectToThrow(() => e.element(e.by.id('ScrollView799')).swipe('noDirection', 0));
-        await expectToThrow(() => e.element(e.by.id('ScrollView799')).swipe('noDirection', 'fast'));
-        await expectToThrow(() => e.element(e.by.id('ScrollView799')).swipe('down', 'NotFastNorSlow'));
-        await expectToThrow(() => e.element(e.by.id('ScrollView799')).swipe('down', 'NotFastNorSlow', 0.9));
+        await expect(() => e.element(e.by.id('ScrollView799')).swipe(4, 'fast')).rejects.toThrow();
+        await expect(() => e.element(e.by.id('ScrollView799')).swipe('noDirection', 0)).rejects.toThrow();
+        await expect(() => e.element(e.by.id('ScrollView799')).swipe('noDirection', 'fast')).rejects.toThrow();
+        await expect(() => e.element(e.by.id('ScrollView799')).swipe('down', 'NotFastNorSlow')).rejects.toThrow();
+        await expect(() => e.element(e.by.id('ScrollView799')).swipe('down', 'NotFastNorSlow', 0.9)).rejects.toThrow();
       });
 
       it('should allow for index-based element discrepancy resolution', async () => {
@@ -264,7 +308,7 @@ describe('AndroidExpect', () => {
       });
 
       it('should fail to find index-based element given invalid args', async () => {
-        await expectToThrow(() => e.element(e.by.id('ScrollView799')).atIndex('NaN'));
+        expect(() => e.element(e.by.id('ScrollView799')).atIndex('NaN')).toThrow();
       });
 
       it('should retrieve attributes', async () => {
@@ -272,13 +316,17 @@ describe('AndroidExpect', () => {
           text: 'hello',
           value: 1,
         };
-        mockExecutor.executeResult = Promise.resolve(JSON.stringify(execResult));
+        mockExecutor.executeResult = Promise.resolve(execResult);
         const result = await e.element(e.by.id('UniqueId005')).getAttributes();
         expect(result).toEqual(execResult);
       });
 
       it('should adjust slider to position', async () => {
         await e.element(e.by.id('sliderWithASimpleID')).adjustSliderToPosition(75);
+      });
+
+      it('should perform accessibility actions', async () => {
+        await e.element(e.by.id('View7991')).performAccessibilityAction('activate');
       });
     });
 
@@ -341,7 +389,6 @@ describe('AndroidExpect', () => {
     });
 
     describe('web', () => {
-
       it('default', async () => {
         await e.web.element(e.by.web.id('id')).tap();
       });
@@ -354,24 +401,28 @@ describe('AndroidExpect', () => {
         await e.web(e.by.id('webview_id')).element(e.by.web.id('id')).tap();
       });
 
-      it(`with wrong matcher should throw`, async () => {
-        await expectToThrow(() => e.web(e.by.web.className('webMatcher')));
-        await expectToThrow(() => e.web(e.by.web.cssSelector('webMatcher')));
-        await expectToThrow(() => e.web(e.by.web.id('webMatcher')));
-        await expectToThrow(() => e.web(e.by.web.href('webMatcher')));
-        await expectToThrow(() => e.web(e.by.web.name('webMatcher')));
-        await expectToThrow(() => e.web(e.by.web.hrefContains('webMatcher')));
-        await expectToThrow(() => e.web(e.by.web.tag('webMatcher')));
-        await expectToThrow(() => e.web(e.by.web.xpath('webMatcher')));
+      it(`with wrong matcher arguments - should throw`, async () => {
+        expect(() => e.web(e.by.web.className('webMatcher'))).toThrow();
+        expect(() => e.web(e.by.web.cssSelector('webMatcher'))).toThrow();
+        expect(() => e.web(e.by.web.id('webMatcher'))).toThrow();
+        expect(() => e.web(e.by.web.href('webMatcher'))).toThrow();
+        expect(() => e.web(e.by.web.name('webMatcher'))).toThrow();
+        expect(() => e.web(e.by.web.hrefContains('webMatcher'))).toThrow();
+        expect(() => e.web(e.by.web.tag('webMatcher'))).toThrow();
+        expect(() => e.web(e.by.web.xpath('webMatcher'))).toThrow();
+      });
+
+      it('with at-index should throw', async () => {
+        expect(() => e.web(e.by.id('webview_id')).atIndex(1).element(e.by.web.id('id')).tap()).toThrow();
       });
 
       it(`inner element with wrong matcher should throw`, async () => {
-        await expectToThrow(() => e.web.element(e.by.accessibilityLabel('nativeMatcher')));
-        await expectToThrow(() => e.web.element(e.by.id('nativeMatcher')));
-        await expectToThrow(() => e.web.element(e.by.label('nativeMatcher')));
-        await expectToThrow(() => e.web.element(e.by.text('nativeMatcher')));
-        await expectToThrow(() => e.web.element(e.by.traits('nativeMatcher')));
-        await expectToThrow(() => e.web.element(e.by.value('nativeMatcher')));
+        expect(() => e.web.element(e.by.accessibilityLabel('nativeMatcher'))).toThrow();
+        expect(() => e.web.element(e.by.id('nativeMatcher'))).toThrow();
+        expect(() => e.web.element(e.by.label('nativeMatcher'))).toThrow();
+        expect(() => e.web.element(e.by.text('nativeMatcher'))).toThrow();
+        expect(() => e.web.element(e.by.traits('nativeMatcher'))).toThrow();
+        expect(() => e.web.element(e.by.value('nativeMatcher'))).toThrow();
       });
     });
 
@@ -491,10 +542,10 @@ describe('AndroidExpect', () => {
       });
 
       it('runScript', async () => {
-        const script = 'function foo(el) {}';
-        await e.web.element(e.by.web.id('id')).runScript(script);
-        await e.web.element(e.by.web.className('className')).runScript(script);
-        await e.web.element(e.by.web.cssSelector('cssSelector')).runScript(script);
+        const script = 'function named(el) { return el.textContent; }';
+        await e.web.element(e.by.web.id('id')).runScript(function () {});
+        await e.web.element(e.by.web.className('className')).runScript((el) => el.textContent);
+        await e.web.element(e.by.web.cssSelector('cssSelector')).runScript(function named(..._args) {});
         await e.web.element(e.by.web.name('name')).runScript(script);
         await e.web.element(e.by.web.xpath('xpath')).runScript(script);
         await e.web.element(e.by.web.href('linkText')).runScript(script);
@@ -502,26 +553,23 @@ describe('AndroidExpect', () => {
         await e.web.element(e.by.web.tag('tag')).runScript(script);
       });
 
-      it('runScriptWithArgs', async () => {
-        const script = 'function bar(a,b) {}';
-        const argsArr = ['fooA','barB'];
-        await e.web.element(e.by.web.id('id')).runScriptWithArgs(script, argsArr);
-        await e.web.element(e.by.web.className('className')).runScriptWithArgs(script, argsArr);
-        await e.web.element(e.by.web.cssSelector('cssSelector')).runScriptWithArgs(script, argsArr);
-        await e.web.element(e.by.web.name('name')).runScriptWithArgs(script, argsArr);
-        await e.web.element(e.by.web.xpath('xpath')).runScriptWithArgs(script, argsArr);
-        await e.web.element(e.by.web.href('linkText')).runScriptWithArgs(script, argsArr);
-        await e.web.element(e.by.web.hrefContains('partialLinkText')).runScriptWithArgs(script, argsArr);
-        await e.web.element(e.by.web.tag('tag')).runScriptWithArgs(script, argsArr);
+      it('runScript (unhappy)', async () => {
+        await expect(e.web.element(e.by.web.id('id')).runScript(/nonsense/)).rejects.toThrow(/script should be a string, but got \/nonsense\//);
+        await expect(e.web.element(e.by.web.id('id')).runScript(null, [])).rejects.toThrow(/script should be a string, but got null/);
+        await expect(e.web.element(e.by.web.id('id')).runScript('return el.textContent')).rejects.toThrow(/Expected a valid function string, but got: return el.textContent/);
       });
 
-      it('runScriptWithArgs (unhappy paths)', async () => {
+      it('runScript (with args)', async () => {
         const script = 'function bar(a,b) {}';
-        const someElement = e.web.element(e.by.web.id('id'));
-
-        await expect(someElement.runScriptWithArgs(script, 42)).rejects.toThrowError(/args must be an array/);
-        await expect(someElement.runScriptWithArgs(script, null)).rejects.toThrowError(/args must be an array/);
-        await expect(someElement.runScriptWithArgs(script, {})).rejects.toThrowError(/args must be an array/);
+        const argsArr = ['fooA', 40];
+        await e.web.element(e.by.web.id('id')).runScript(script, argsArr);
+        await e.web.element(e.by.web.className('className')).runScript(script, argsArr);
+        await e.web.element(e.by.web.cssSelector('cssSelector')).runScript(script, argsArr);
+        await e.web.element(e.by.web.name('name')).runScript(script, argsArr);
+        await e.web.element(e.by.web.xpath('xpath')).runScript(script, argsArr);
+        await e.web.element(e.by.web.href('linkText')).runScript(script, argsArr);
+        await e.web.element(e.by.web.hrefContains('partialLinkText')).runScript(script, argsArr);
+        await e.web.element(e.by.web.tag('tag')).runScript(script, argsArr);
       });
 
       it('getCurrentUrl', async () => {
@@ -614,16 +662,29 @@ describe('AndroidExpect', () => {
         await e.expect(webview.element(e.by.web.id('id'))).toExist();
       });
     });
+
+    it('should throw for secured web interactions (`asSecured()` in unsupported)', async () => {
+      expect(() => e.web.element(e.by.web.id('id')).asSecured().tap()).toThrow();
+    });
+  });
+
+  describe('System (unsupported)', () => {
+    const unsupportedErrorMessage =
+        /System interactions are not supported on Android, use UiDevice APIs directly instead/;
+
+    it('should throw for system element call', async () => {
+      await expect(async () => e.system.element('anything')).rejects.toThrow(unsupportedErrorMessage);
+    });
+
+    it('should throw for system type matcher', async () => {
+      await expect(async () => e.by.system.type('type')).rejects.toThrow(unsupportedErrorMessage);
+    });
+
+    it('should throw for system label matcher', async () => {
+      await expect(async () => e.by.system.label('label')).rejects.toThrow(unsupportedErrorMessage);
+    });
   });
 });
-
-async function expectToThrow(func) {
-  try {
-    await func();
-  } catch (ex) {
-    expect(ex).toBeDefined();
-  }
-}
 
 class MockExecutor {
   constructor() {

@@ -1,10 +1,5 @@
-import React from 'react';
-import {
-  NativeModules,
-} from 'react-native';
+import {LaunchArguments} from 'react-native-launch-arguments';
 import AbstractArgsListScreen from './AbstractArgsListScreen';
-
-const { NativeModule } = NativeModules;
 
 export default class LaunchArgsScreen extends AbstractArgsListScreen {
   constructor(props) {
@@ -12,7 +7,7 @@ export default class LaunchArgsScreen extends AbstractArgsListScreen {
   }
 
   async readArguments() {
-    return await NativeModule.getLaunchArguments();
+    return LaunchArguments.value();
   }
 
   getTitle() {

@@ -1,34 +1,26 @@
 buildscript {
-    apply from: './rninfo.gradle'
-
-    def androidGradlePluginVersion =
-            rnInfo.isRN69OrHigher ? '7.1.1'
-            : rnInfo.isRN68OrHigher ? '7.0.4'
-            : rnInfo.isRN66OrHigher ? '4.2.2'
-            : '4.1.0'
-
-    println "[$project] Resorted to Android Gradle-plugin version $androidGradlePluginVersion"
+    apply from: '../../android/rninfo.gradle'
 
     ext {
         isOfficialDetoxApp = true
-        kotlinVersion = '1.6.21'
-        buildToolsVersion = '31.0.0'
-        compileSdkVersion = 31
-        targetSdkVersion = 31
+        kotlinVersion = '1.8.0'
+        buildToolsVersion = '34.0.0'
+        compileSdkVersion = 34
+        targetSdkVersion = 34
         minSdkVersion = 21
-        appCompatVersion = (rnInfo.isRN68OrHigher ? '1.4.2' : '1.3.0')
+        appCompatVersion = '1.6.1'
     }
     ext.detoxKotlinVersion = ext.kotlinVersion
 
     repositories {
         google()
-        mavenLocal()
         mavenCentral()
+        mavenLocal()
     }
 
     dependencies {
-        classpath "com.android.tools.build:gradle:$androidGradlePluginVersion"
-        classpath 'de.undercouch:gradle-download-task:5.0.1'
+        classpath "com.android.tools.build:gradle"
+        classpath 'com.facebook.react:react-native-gradle-plugin'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
 
         // Needed by Spek (https://spekframework.org/setup-android)
@@ -39,20 +31,8 @@ buildscript {
 
 allprojects {
     repositories {
-        maven {
-            url "$rootDir/../../node_modules/react-native/android"
-        }
-        maven {
-            url("$rootDir/../node_modules/jsc-android/dist")
-        }
-        mavenCentral {
-            // We don't want to fetch react-native from Maven Central as there are
-            // older versions over there.
-            content {
-                excludeGroup "com.facebook.react"
-            }
-        }
         google()
+        mavenCentral()
         mavenLocal()
     }
 }
@@ -65,4 +45,8 @@ subprojects {
             }
         }
     }
+}
+
+if (ext.rnInfo.isRN73OrHigher) {
+    apply plugin: "com.facebook.react.rootproject"
 }

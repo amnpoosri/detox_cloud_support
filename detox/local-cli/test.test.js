@@ -1,12 +1,11 @@
 // @ts-nocheck
 if (process.platform === 'win32') {
-  jest.retryTimes(1); // TODO: investigate why it gets stuck for the 1st time on Windows
+  jest.retryTimes(1); // TODO [2024-12-01]: investigate why it gets stuck for the 1st time on Windows
 }
 
 jest.mock('../src/logger/DetoxLogger');
-jest.mock('../src/devices/DeviceRegistry');
-jest.mock('../src/devices/allocation/drivers/android/genycloud/GenyDeviceRegistryFactory');
 jest.mock('./utils/jestInternals');
+jest.mock('./utils/interruptListeners');
 
 const cp = require('child_process');
 const cpSpawn = cp.spawn;
@@ -20,14 +19,14 @@ const { buildMockCommand, callCli } = require('../__tests__/helpers');
 
 const { DEVICE_LAUNCH_ARGS_DEPRECATION } = require('./testCommand/warnings');
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 describe('CLI', () => {
   let _env;
   let logger;
   let _temporaryFiles;
   let detoxConfig;
   let detoxConfigPath;
-  let DeviceRegistry;
-  let GenyDeviceRegistryFactory;
   let jestInternals;
 
   let mockExecutable;
@@ -80,11 +79,6 @@ describe('CLI', () => {
     });
 
     logger = () => require('../src/logger/DetoxLogger').instances[0];
-    DeviceRegistry = require('../src/devices/DeviceRegistry');
-    DeviceRegistry.forAndroid.mockImplementation(() => new DeviceRegistry());
-    DeviceRegistry.forIOS.mockImplementation(() => new DeviceRegistry());
-    GenyDeviceRegistryFactory = require('../src/devices/allocation/drivers/android/genycloud/GenyDeviceRegistryFactory');
-    GenyDeviceRegistryFactory.forGlobalShutdown.mockImplementation(() => new DeviceRegistry());
   });
 
   afterEach(async () => {
@@ -152,6 +146,38 @@ describe('CLI', () => {
     });
   });
 
+  describe('detached runner', () => {
+    beforeEach(() => {
+      detoxConfig.testRunner.detached = true;
+    });
+
+    test('should be able to run as you would normally expect', async () => {
+      await run();
+      expect(_.last(cliCall().argv)).toEqual('e2e/config.json');
+    });
+
+    test('should intercept SIGINT and SIGTERM', async () => {
+      const { subscribe, unsubscribe } = jest.requireMock('./utils/interruptListeners');
+      const simulateSIGINT = () => subscribe.mock.calls[0][0]();
+
+      mockExitCode(1);
+      mockLongRun(2000);
+
+      await Promise.all([
+        run('--retries 2').catch(_.noop),
+        sleep(1000).then(() => {
+          simulateSIGINT();
+          simulateSIGINT();
+          expect(unsubscribe).not.toHaveBeenCalled();
+        }),
+      ]);
+
+      expect(unsubscribe).toHaveBeenCalled();
+      expect(cliCall(0)).not.toBe(null);
+      expect(cliCall(1)).toBe(null);
+    });
+  });
+
   test('should use testRunner.args._ as default specs', async () => {
     detoxConfig.testRunner.args._ = ['e2e/sanity'];
     await run();
@@ -167,6 +193,83 @@ describe('CLI', () => {
     await run(__loglevel, 'trace');
     expect(cliCall().env).toHaveProperty('DETOX_LOGLEVEL');
     expect(cliCall().fullCommand).toMatch(/ DETOX_LOGLEVEL="trace" /);
+  });
+
+  test('should run the start commands before the tests', async () => {
+    const startCmd = buildMockCommand({ ...mockExecutable.options });
+    singleConfig().apps.push({
+      name: 'app1',
+      type: 'ios.app',
+      binaryPath: 'ios/build/Build/Products/Debug-iphonesimulator/example.app',
+      start: `${startCmd.cmd} --app=1`,
+    }, {
+      name: 'app2',
+      type: 'ios.app',
+      binaryPath: 'ios/build/Build/Products/Debug-iphonesimulator/example.app',
+      start: `${startCmd.cmd} --app=2`,
+    });
+
+    await run();
+
+    expect([
+      cliCall(0).argv[1],
+      cliCall(1).argv[1],
+    ].sort()).toEqual(['--app=1', '--app=2']);
+    expect(cliCall(2).argv).toEqual([expect.stringContaining('executable'), '--config', 'e2e/config.json']);
+  });
+
+  test('should kill the start command after the tests', async () => {
+    const startCmd = buildMockCommand({ ...mockExecutable.options, sleep: 10000 });
+    singleConfig().apps.push({
+      type: 'ios.app',
+      binaryPath: 'ios/build/Build/Products/Debug-iphonesimulator/example.app',
+      start: `${startCmd.cmd} --some-start=command`,
+    });
+
+    await run();
+    expect(cliCall(0).argv).toEqual([expect.stringContaining('executable'), '--config', 'e2e/config.json']);
+    expect(cliCall(1)).toBe(null); // because the start command had been killed earlier than wrote the call details (10000ms)
+  }, 2000);
+
+  test('should not run tests if the start command fails', async () => {
+    const startCmd = buildMockCommand({ ...mockExecutable.options, exitCode: 1 });
+    singleConfig().apps.push({
+      type: 'ios.app',
+      binaryPath: 'ios/build/Build/Products/Debug-iphonesimulator/example.app',
+      start: `${startCmd.cmd} --some-start=command`,
+    });
+
+    await expect(run).rejects.toThrowError(/Command exited with code 1:.*--some-start=command/);
+    expect(cliCall(0).argv[1]).toBe('--some-start=command');
+    expect(cliCall(1)).toBe(null);
+  });
+
+  test('--start=force should run tests even though the start command fails', async () => {
+    const startCmd = buildMockCommand({ ...mockExecutable.options, exitCode: 1 });
+    singleConfig().apps.push({
+      type: 'ios.app',
+      binaryPath: 'ios/build/Build/Products/Debug-iphonesimulator/example.app',
+      start: `${startCmd.cmd} --some-start=command`,
+    });
+
+    await run('--start=force');
+    expect(cliCall(0).argv[1]).toBe('--some-start=command');
+    expect(cliCall(1).argv).toEqual([expect.stringContaining('executable'), '--config', 'e2e/config.json']);
+  });
+
+  test.each([
+    ['--no-start'],
+    ['--start=false'],
+  ])('%s should run tests without the start command', async (__start) => {
+    const startCmd = buildMockCommand({ ...mockExecutable.options, exitCode: 1 });
+    singleConfig().apps.push({
+      type: 'ios.app',
+      binaryPath: 'ios/build/Build/Products/Debug-iphonesimulator/example.app',
+      start: `${startCmd.cmd} --some-start=command`,
+    });
+
+    await run(__start);
+    expect(cliCall(0).argv).toEqual([expect.stringContaining('executable'), '--config', 'e2e/config.json']);
   });
 
   test.each([['-R'], ['--retries']])('%s <value> should execute successful run once', async (__retries) => {
@@ -550,6 +653,11 @@ describe('CLI', () => {
 
   function mockExitCode(code) {
     mockExecutable.options.exitCode = code;
+    detoxConfig.testRunner.args.$0 = mockExecutable.cmd;
+  }
+
+  function mockLongRun(ms) {
+    mockExecutable.options.sleep = ms;
     detoxConfig.testRunner.args.$0 = mockExecutable.cmd;
   }
 });

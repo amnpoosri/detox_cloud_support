@@ -47,7 +47,7 @@ class DetoxContext {
     this[$sessionState] = this[$restoreSessionState]();
 
     /**
-     * @type {DetoxLogger & Detox.Logger}
+     * @type {import('../logger/').DetoxLogger & Detox.Logger}
      */
     this[symbols.logger] = new DetoxLogger({
       file: temporary.for.jsonl(`${this[$sessionState].id}.${process.pid}`),
@@ -101,6 +101,8 @@ class DetoxContext {
   });
   /** @abstract */
   [symbols.reportTestResults](_testResults) {}
+  /** @abstract */
+  [symbols.conductEarlyTeardown](_permanent) {}
   /**
    * @abstract
    * @param {Partial<DetoxInternals.DetoxInitOptions>} _opts
@@ -148,6 +150,12 @@ class DetoxContext {
     this[$worker].id = opts.workerId;
     await this[$worker].init();
   }
+
+  /** @abstract */
+  async [symbols.allocateDevice](_deviceConfig) {}
+
+  /** @abstract */
+  async [symbols.deallocateDevice](_deviceCookie) {}
 
   async [symbols.uninstallWorker]() {
     try {

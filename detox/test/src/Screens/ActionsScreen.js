@@ -9,12 +9,18 @@ import {
   Platform,
   Dimensions,
   StyleSheet,
-  Slider as LegacySlider,
   SafeAreaView,
   requireNativeComponent,
 } from 'react-native';
 import TextInput from '../Views/TextInput';
 import Slider from '@react-native-community/slider';
+
+let LegacySlider;
+try {
+  LegacySlider = require('react-native').Slider;
+} catch (e) {
+  // Ignore
+}
 
 const DoubleTapsText = requireNativeComponent('DetoxDoubleTapsTextView');
 const SluggishTapsText = requireNativeComponent('DetoxSluggishTapsTextView');
@@ -60,6 +66,17 @@ export default class ActionsScreen extends Component {
 
         <TouchableOpacity onPress={this.onButtonPress.bind(this, 'Tap Working')}
           onLongPress={this.onButtonPress.bind(this, 'Long Press Working')}
+          testID="View7991"
+          accessibilityActions={[
+            { name: 'activate', label: 'activate' },
+            { name: 'increment', label: 'increment' },
+            { name: 'decrement', label: 'decrement' },
+            { name: 'magicTap', label: 'magicTap' },
+            { name: 'escape', label: 'escape' },
+            { name: 'longpress', label: 'longpress' },
+            { name: 'custom', label: 'custom' }
+          ]}
+          onAccessibilityAction={({ nativeEvent: { actionName }}) => this.onButtonPress(`Accessibility Action ${actionName} Working`)}
         >
           <Text style={{ color: 'blue', marginTop: isIos? 40 : 0, marginBottom: 10, textAlign: 'center' }}>Tap Me</Text>
         </TouchableOpacity>
@@ -70,6 +87,16 @@ export default class ActionsScreen extends Component {
         >
           <Text style={{ color: 'blue', marginBottom: 10, textAlign: 'center' }}>Long Press Me 1.5s</Text>
         </TouchableOpacity>
+
+        <View
+          onStartShouldSetResponder={(event) => {
+            const nativeEvent = event.nativeEvent;
+            return nativeEvent.locationX < 10 && nativeEvent.locationY < 10;
+          }}
+          onResponderRelease={() => this.onButtonPress('Long Press on Top Left Working')}
+        >
+          <Text style={{ color: 'blue', marginBottom: 10, textAlign: 'center' }}>Long Press on Top Left</Text>
+        </View>
 
         <TouchableOpacity onPress={this.onLongTimeout.bind(this)}
         >
@@ -163,9 +190,12 @@ export default class ActionsScreen extends Component {
           </ScrollView>
         </View>
 
-        <View style={{ height: 40, borderColor: '#c0c0c0', marginHorizontal: 20 }}>
-          <LegacySlider testID='legacySliderWithASimpleID' maximumValue={1000.0} minimumValue={0.0} value={250.0}/>
-        </View>
+        {
+          LegacySlider &&
+          <View style={{ height: 40, borderColor: '#c0c0c0', marginHorizontal: 20 }}>
+            <LegacySlider testID='legacySliderWithASimpleID' maximumValue={1000.0} minimumValue={0.0} value={250.0} />
+          </View>
+        }
 
         <View style={{ height: 40, borderColor: '#c0c0c0', marginHorizontal: 20 }}>
           <Slider testID='sliderWithASimpleID' maximumValue={1000.0} minimumValue={0.0} value={250.0}/>
@@ -290,6 +320,6 @@ export default class ActionsScreen extends Component {
       backPressed: true
     });
     return true;
-  };
+  }
 
 }

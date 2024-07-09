@@ -1,32 +1,33 @@
 package com.wix.detox.espresso;
 
-import android.view.View;
-
-import org.hamcrest.Matcher;
-
-import androidx.test.espresso.matcher.ViewMatchers.Visibility;
-
 import static androidx.test.espresso.matcher.ViewMatchers.hasDescendant;
 import static androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom;
 import static androidx.test.espresso.matcher.ViewMatchers.isChecked;
 import static androidx.test.espresso.matcher.ViewMatchers.isDescendantOfA;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
-import static androidx.test.espresso.matcher.ViewMatchers.isDisplayingAtLeast;
-import static androidx.test.espresso.matcher.ViewMatchers.isNotChecked;
-import static androidx.test.espresso.matcher.ViewMatchers.withContentDescription;
-import static androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility;
-import static androidx.test.espresso.matcher.ViewMatchers.withTagValue;
-import static androidx.test.espresso.matcher.ViewMatchers.withText;
 import static androidx.test.espresso.matcher.ViewMatchers.isFocused;
+import static androidx.test.espresso.matcher.ViewMatchers.isNotChecked;
+import static androidx.test.espresso.matcher.ViewMatchers.withEffectiveVisibility;
+import static com.wix.detox.espresso.matcher.ViewMatchers.matcherForDisplayingAtLeast;
 import static com.wix.detox.espresso.matcher.ViewMatchers.isMatchingAtIndex;
 import static com.wix.detox.espresso.matcher.ViewMatchers.isOfClassName;
 import static com.wix.detox.espresso.matcher.ViewMatchers.toHaveSliderPosition;
+import static com.wix.detox.espresso.matcher.ViewMatchers.withAccessibilityLabel;
+import static com.wix.detox.espresso.matcher.ViewMatchers.withContentDescription;
+import static com.wix.detox.espresso.matcher.ViewMatchers.withShallowAccessibilityLabel;
+import static com.wix.detox.espresso.matcher.ViewMatchers.withTagValue;
+import static com.wix.detox.espresso.matcher.ViewMatchers.withText;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.anyOf;
-import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+
+import android.view.View;
+
+import androidx.test.espresso.matcher.ViewMatchers.Visibility;
+
+import org.hamcrest.Matcher;
 
 /**
  * Created by simonracz on 10/07/2017.
@@ -38,17 +39,25 @@ public class DetoxMatcher {
         // static class
     }
 
-    public static Matcher<View> matcherForText(String text) {
+    public static Matcher<View> matcherForText(String text, boolean isRegex) {
         // return anyOf(withText(text), withContentDescription(text));
-        return allOf(withText(text), withEffectiveVisibility(Visibility.VISIBLE));
+        return allOf(withText(text, isRegex), withEffectiveVisibility(Visibility.VISIBLE));
+    }
+
+    public static Matcher<View> matcherForAccessibilityLabel(String label, boolean isRegex) {
+        return allOf(withAccessibilityLabel(label, isRegex), withEffectiveVisibility(Visibility.VISIBLE));
+    }
+
+    public static Matcher<View> matcherForShallowAccessibilityLabel(String label, boolean isRegex) {
+        return allOf(withShallowAccessibilityLabel(label, isRegex), withEffectiveVisibility(Visibility.VISIBLE));
     }
 
     public static Matcher<View> matcherForContentDescription(String contentDescription) {
-        return allOf(withContentDescription(contentDescription), withEffectiveVisibility(Visibility.VISIBLE));
+        return allOf(withContentDescription(contentDescription, false), withEffectiveVisibility(Visibility.VISIBLE));
     }
 
-    public static Matcher<View> matcherForTestId(String testId) {
-        return allOf(withTagValue(is((Object) testId)), withEffectiveVisibility(Visibility.VISIBLE));
+    public static Matcher<View> matcherForTestId(String testId, boolean isRegex) {
+        return allOf(withTagValue(testId, isRegex), withEffectiveVisibility(Visibility.VISIBLE));
     }
 
     public static Matcher<View> matcherForToggleable(boolean value) {
@@ -80,7 +89,7 @@ public class DetoxMatcher {
     }
 
     public static Matcher<View> matcherForSufficientlyVisible(int pct) {
-        return isDisplayingAtLeast(pct);
+        return matcherForDisplayingAtLeast(pct);
     }
 
     public static Matcher<View> matcherForNotVisible() {

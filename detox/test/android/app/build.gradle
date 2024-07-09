@@ -1,17 +1,33 @@
 apply plugin: 'com.android.application'
-apply from: '../rninfo.gradle'
+apply plugin: 'com.facebook.react'
+apply plugin: 'kotlin-android'
+apply from: '../../../android/rninfo.gradle'
 
-project.ext.react = [
-    enableHermes: true
-]
-apply from: '../../node_modules/react-native/react.gradle'
 
 android {
-    compileSdkVersion rootProject.ext.compileSdkVersion
+    namespace 'com.example'
 
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+    buildToolsVersion = rootProject.ext.buildToolsVersion
+    compileSdk = rootProject.ext.compileSdkVersion
+
+    if (rnInfo.isRN72OrHigher) {
+        compileOptions {
+            sourceCompatibility JavaVersion.VERSION_17
+            targetCompatibility JavaVersion.VERSION_17
+        }
+
+        kotlinOptions {
+            jvmTarget = '17'
+        }
+    } else {
+        compileOptions {
+            sourceCompatibility JavaVersion.VERSION_11
+            targetCompatibility JavaVersion.VERSION_11
+        }
+
+        kotlinOptions {
+            jvmTarget = '11'
+        }
     }
 
     defaultConfig {
@@ -55,17 +71,7 @@ android {
         release {
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro', "${project(':detox').projectDir}/proguard-rules-app.pro"
-
             signingConfig signingConfigs.release
-        }
-    }
-    productFlavors {
-        flavorDimensions 'compileRNFromSource'
-        fromSource {
-            dimension 'compileRNFromSource'
-        }
-        fromBin {
-            dimension 'compileRNFromSource'
         }
     }
     packagingOptions {
@@ -77,26 +83,27 @@ android {
         exclude 'META-INF/LICENSE.txt'
         exclude 'META-INF/NOTICE.txt'
     }
+
+    buildFeatures {
+        buildConfig = true
+    }
 }
 
 dependencies {
+    // The version of react-native is set by the React Native Gradle Plugin
+    implementation('com.facebook.react:react-android')
+
     implementation "androidx.appcompat:appcompat:${rootProject.ext.appCompatVersion}"
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+
     implementation project(path: ':@react-native-community_slider')
-
-    // noinspection GradleDynamicVersion
-    fromBinImplementation('com.facebook.react:react-native:+')
-
-    // In order to build from source:
-    // 1. Uncomment the fromSourceImplementation() statement
-    // 2. Uncomment associated section in settings.gradle
-    // 3. Pave through the wilderness
-//    fromSourceImplementation(project(path: ':ReactAndroid'))
-
     implementation project(':AsyncStorage')
     implementation project(':react-native-webview')
     implementation project(':react-native-community-checkbox')
     implementation project(':react-native-community-geolocation')
+    implementation project(':react-native-datetimepicker')
+    implementation project(':react-native-launcharguments')
+    implementation project(':react-native-permissions')
 
     androidTestImplementation(project(path: ':detox'))
     androidTestImplementation 'com.linkedin.testbutler:test-butler-library:2.2.1'
@@ -104,15 +111,7 @@ dependencies {
 
 // Apply Hermes as our JS engine
 dependencies {
-    if (rnInfo.isRN69OrHigher) { // TODO this is actually likely to work with older RN versions as well
-        implementation('com.facebook.react:hermes-engine:+') {
-            exclude group: 'com.facebook.fbjni'
-        }
-    } else {
-        def hermesPath = '../../node_modules/hermes-engine/android'
-        debugImplementation files("$hermesPath/hermes-debug.aar")
-        releaseImplementation files("$hermesPath/hermes-release.aar")
-    }
+    implementation('com.facebook.react:hermes-android')
 }
 
 // Run this once to be able to run the application with BUCK

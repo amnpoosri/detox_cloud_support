@@ -19,6 +19,19 @@ describe("Test", () => {
     beforeAll(async () => {
         await device.reloadReactNative();
 
+        await device.setStatusBar({ time: "12:34" });
+        await device.setStatusBar({
+            time: "12:34",
+            dataNetwork: "wifi",
+            wifiMode: "failed",
+            wifiBars: "2",
+            cellularMode: "searching",
+            cellularBars: "3",
+            operatorName: "A1",
+            batteryState: "charging",
+            batteryLevel: "50",
+        });
+
         const artifactsPaths: string[] = [
             await device.takeScreenshot("test screenshot"),
             await device.captureViewHierarchy(),
@@ -56,6 +69,7 @@ describe("Test", () => {
             element(by.id("element").withDescendant(by.id("child_element")))
         ).toNotExist();
 
+        // eslint-disable-next-line jest/valid-expect
         const expectElement = expect(element(by.id('TextField_Id1')));
 
         await expectElement.toBeVisible();
@@ -78,7 +92,21 @@ describe("Test", () => {
             .whileElement(by.id("ScrollView630"))
             .scroll(50, "down");
 
+        await waitFor(element(by.text("Text5")))
+          .toBeVisible()
+          .whileElement(by.id("ScrollView630"))
+          .scroll(50, "down", 0.5, 0.5);
+
+        // @ts-expect-error
+        await waitFor(element(by.text("Text5"))).toBeVisible().whileElement(by.id("ScrollView630")).tap();
+
         await web.element(by.web.id("btnSave")).tap();
+        await web.element(by.web.id("btnSave")).runScript('(el) => el.click()');
+        const scriptResult = await web.element(by.web.id("btnSave")).runScript(function (el: any, text: string) {
+          el.textContent = text;
+          return text.length;
+        }, ['new button text']);
+        assertType<number>(scriptResult);
         await web.element(by.web.className("scroll-end")).atIndex(0).scrollToView();
 
         const webview = web(by.id("webview"));
@@ -93,12 +121,17 @@ describe("Test", () => {
 
         beforeEach(async () => {
             const attributes = await element(by.id("element")).getAttributes();
+
             if ('elements' in attributes) {
-                commonAttributes = iosAttributes = attributes.elements[0];
+                if ('activationPoint' in attributes.elements[0]) {
+                    commonAttributes = iosAttributes = attributes.elements[0] as Detox.IosElementAttributes;
+                } else {
+                    commonAttributes = androidAttributes = attributes.elements[0] as Detox.AndroidElementAttributes;
+                }
             } else if ('activationPoint' in attributes) {
-                commonAttributes = iosAttributes = attributes;
+                commonAttributes = iosAttributes = attributes as Detox.IosElementAttributes;
             } else {
-                commonAttributes = androidAttributes = attributes;
+                commonAttributes = androidAttributes = attributes as Detox.AndroidElementAttributes;
             }
         });
 
@@ -110,6 +143,10 @@ describe("Test", () => {
             assertType<string | undefined>(commonAttributes.label);
             assertType<string | undefined>(commonAttributes.placeholder);
             assertType<unknown>(commonAttributes.value);
+            assertType<number>(commonAttributes.frame.x);
+            assertType<number>(commonAttributes.frame.y);
+            assertType<number>(commonAttributes.frame.width);
+            assertType<number>(commonAttributes.frame.height);
         });
 
         test('iOS-specific attributes', () => {
@@ -118,10 +155,6 @@ describe("Test", () => {
             assertType<number>(iosAttributes.normalizedActivationPoint.x);
             assertType<number>(iosAttributes.normalizedActivationPoint.y);
             assertType<boolean>(iosAttributes.hittable);
-            assertType<number>(iosAttributes.frame.x);
-            assertType<number>(iosAttributes.frame.y);
-            assertType<number>(iosAttributes.frame.width);
-            assertType<number>(iosAttributes.frame.height);
             assertType<number>(iosAttributes.elementFrame.x);
             assertType<number>(iosAttributes.elementFrame.y);
             assertType<number>(iosAttributes.elementFrame.width);

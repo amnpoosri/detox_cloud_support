@@ -142,6 +142,16 @@ Default: `false`.
 When true, tells `detox test` to cancel next retrying if it gets at least one report about a [permanent test suite failure](../api/internals.mdx#reporting-test-results).
 Has no effect, if [`testRunner.retries`] is undefined or set to zero.
 
+### `testRunner.detached` \[boolean]
+
+Default: `false`.
+
+When true, tells `detox test` to spawn the test runner in a detached mode.
+
+This is useful in CI environments, where you want to intercept SIGINT and SIGTERM signals to gracefully shut down the test runner and the device.
+
+Instead of passing the kill signal to the child process (the test runner), Detox will send an emergency shutdown request to all the workers, and then it will wait for them to finish.
+
 ### `testRunner.forwardEnv` \[boolean]
 
 Default: `false`.
@@ -192,7 +202,7 @@ In other words, if you’re implementing (or using) a custom integration with so
 
 #### `testRunner.jest.setupTimeout` \[number]
 
-Default: `300000` (5 minutes).
+Default: `120000` (2 minutes).
 
 As a part of the [environment setup](https://jestjs.io/docs/configuration/#testenvironment-string)), Detox boots the device and installs the apps.
 If that takes longer than the specified value, the entire test suite will be considered as failed, e.g.:
@@ -201,7 +211,7 @@ If that takes longer than the specified value, the entire test suite will be con
  FAIL  e2e/starter.test.js
   ● Test suite failed to run
 
-    Exceeded timeout of 300000ms while setting up Detox environment
+    Exceeded timeout of 120000ms while setting up Detox environment
 ```
 
 #### `testRunner.jest.teardownTimeout` \[number]

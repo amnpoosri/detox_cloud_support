@@ -1,6 +1,11 @@
 const driver = require('./drivers/actions-driver').actionsScreenDriver;
+const custom = require('./utils/custom-it');
 
 describe('Actions', () => {
+  beforeAll(async () => {
+    await device.launchApp();
+  });
+
   beforeEach(async () => {
     await device.reloadReactNative();
     await element(by.text('Actions')).tap();
@@ -21,9 +26,34 @@ describe('Actions', () => {
     await expect(element(by.text('Long Press With Duration Working!!!'))).toBeVisible();
   });
 
+  it('should long press with point', async () => {
+    await element(by.text('Long Press on Top Left')).longPress({ x: 5, y: 5 });
+    await expect(element(by.text('Long Press on Top Left Working!!!'))).toBeVisible();
+  });
+
+  it('should not succeed in long pressing with point outside the target area', async () => {
+    await element(by.text('Long Press on Top Left')).longPress({ x: 15, y: 15 });
+    await expect(element(by.text('Long Press on Top Left Working!!!'))).not.toBeVisible();
+  });
+
   it(':android: should tap on an element at point', async () => {
     await driver.tapsElement.tapAtPoint();
     await driver.tapsElement.assertTappedOnce();
+  });
+
+  it.each([
+    'activate',
+    'magicTap',
+    'escape',
+    'increment',
+    'decrement',
+    'longpress',
+    'custom',
+  ])('should perform %s accessibilityAction', async (actionName) => {
+    await element(by.id('View7991')).performAccessibilityAction(actionName);
+    await expect(
+      element(by.text(`Accessibility Action ${actionName} Working!!!`)),
+    ).toBeVisible();
   });
 
   describe('multi-tapping', () => {
@@ -197,7 +227,7 @@ describe('Actions', () => {
     await expect(element(by.id('UniqueId007'))).toBeVisible();
   });
 
-  it('should adjust legacy slider and assert its value', async () => {
+  custom.it.skipFromRNVersion(71)('should adjust legacy slider and assert its value', async () => {
     const reactSliderId = 'legacySliderWithASimpleID';
     await expect(element(by.id(reactSliderId))).toHaveSliderPosition(0.25);
     await element(by.id(reactSliderId)).adjustSliderToPosition(0.75);

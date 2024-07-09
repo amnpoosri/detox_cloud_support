@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -19,9 +20,8 @@ function which(executable, path) {
 const DETOX_LIBRARY_ROOT_PATH = path.join(appdatapath.appDataPath(), 'Detox');
 const MISSING_SDK_ERROR = `$ANDROID_SDK_ROOT is not defined, set the path to the SDK installation directory into $ANDROID_SDK_ROOT,
 Go to https://developer.android.com/studio/command-line/variables.html for more details`;
-const DEVICE_LOCK_FILE_PATH_IOS = path.join(DETOX_LIBRARY_ROOT_PATH, 'device.registry.state.lock');
-const DEVICE_LOCK_FILE_PATH_ANDROID = path.join(DETOX_LIBRARY_ROOT_PATH, 'android-device.registry.state.lock');
-const GENYCLOUD_GLOBAL_CLEANUP_FILE_PATH = path.join(DETOX_LIBRARY_ROOT_PATH, 'genycloud-cleanup.lock');
+const DETOX_LOCK_FILE_PATH = path.join(DETOX_LIBRARY_ROOT_PATH, 'global-context.json');
+const DEVICE_REGISTRY_PATH = path.join(DETOX_LIBRARY_ROOT_PATH, 'device.registry.json');
 const LAST_FAILED_TESTS_PATH = path.join(DETOX_LIBRARY_ROOT_PATH, 'last-failed.txt');
 
 function getAndroidSDKPath() {
@@ -172,40 +172,51 @@ function throwMissingGmsaasError() {
   throw new DetoxRuntimeError(`Failed to locate Genymotion's gmsaas executable. Please add it to your $PATH variable!\nPATH is currently set to: ${process.env.PATH}`);
 }
 
-function getDetoxVersion() {
+const getDetoxVersion = _.once(() => {
   return require(path.join(__dirname, '../../package.json')).version;
-}
+});
 
-let _iosFrameworkPath;
-async function getFrameworkPath() {
-  if (!_iosFrameworkPath) {
-    _iosFrameworkPath = _doGetFrameworkPath();
+const getBuildFolderName = _.once(async () => {
+  const detoxVersion = getDetoxVersion();
+  const xcodeVersion = await exec('xcodebuild -version').then(result => result.stdout.trim());
+
+  return crypto.createHash('sha1')
+      .update(`${detoxVersion}\n${xcodeVersion}\n`)
+      .digest('hex');
+});
+
+const getFrameworkDirPath = `${DETOX_LIBRARY_ROOT_PATH}/ios/framework`;
+
+const getFrameworkPath = _.once(async () => {
+  const buildFolder = await getBuildFolderName();
+  return `${getFrameworkDirPath}/${buildFolder}/Detox.framework`;
+});
+
+const getXCUITestRunnerDirPath = `${DETOX_LIBRARY_ROOT_PATH}/ios/xcuitest-runner`;
+
+const getXCUITestRunnerPath = _.once(async () => {
+  const buildFolder = await getBuildFolderName();
+  const derivedDataPath = `${getXCUITestRunnerDirPath}/${buildFolder}`;
+  const xctestrunPath = await exec(`find ${derivedDataPath} -name "*.xctestrun" -print -quit`)
+      .then(result => result.stdout.trim());
+
+  if (!xctestrunPath) {
+    throw new DetoxRuntimeError(`Failed to find .xctestrun file in ${derivedDataPath}`);
   }
 
-  return _iosFrameworkPath;
-}
-
-async function _doGetFrameworkPath() {
-  const detoxVersion = getDetoxVersion();
-  const sha1 = (await exec(`(echo "${detoxVersion}" && xcodebuild -version) | shasum | awk '{print $1}'`)).stdout.trim();
-  return `${DETOX_LIBRARY_ROOT_PATH}/ios/${sha1}/Detox.framework`;
-}
+  return xctestrunPath;
+});
 
 function getDetoxLibraryRootPath() {
   return DETOX_LIBRARY_ROOT_PATH;
 }
 
-function getDeviceLockFilePathIOS() {
-  return DEVICE_LOCK_FILE_PATH_IOS;
+function getDetoxLockFilePath() {
+  return DETOX_LOCK_FILE_PATH;
 }
 
-// TODO This can probably be merged with IOS' by now
-function getDeviceLockFilePathAndroid() {
-  return DEVICE_LOCK_FILE_PATH_ANDROID;
-}
-
-function getGenyCloudGlobalCleanupFilePath() {
-  return GENYCLOUD_GLOBAL_CLEANUP_FILE_PATH;
+function getDeviceRegistryPath() {
+  return DEVICE_REGISTRY_PATH;
 }
 
 function getLastFailedTestsPath() {
@@ -225,13 +236,15 @@ module.exports = {
   getAndroidSdkManagerPath,
   getGmsaasPath,
   getDetoxVersion,
+  getFrameworkDirPath,
   getFrameworkPath,
+  getXCUITestRunnerDirPath,
+  getXCUITestRunnerPath,
   getAndroidSDKPath,
   getAndroidEmulatorPath,
   getDetoxLibraryRootPath,
-  getDeviceLockFilePathIOS,
-  getDeviceLockFilePathAndroid,
-  getGenyCloudGlobalCleanupFilePath,
+  getDetoxLockFilePath,
+  getDeviceRegistryPath,
   getLastFailedTestsPath,
   getHomeDir,
 };

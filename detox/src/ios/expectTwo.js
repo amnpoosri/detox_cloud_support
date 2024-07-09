@@ -1,15 +1,21 @@
 // @ts-nocheck
-const assert = require('assert');
 const path = require('path');
 
 const fs = require('fs-extra');
 const _ = require('lodash');
 const tempfile = require('tempfile');
 
-const { assertEnum, assertNormalized } = require('../utils/assertArgument');
+const { assertTraceDescription, assertEnum, assertNormalized } = require('../utils/assertArgument');
+const { removeMilliseconds } = require('../utils/dateUtils');
 const { actionDescription, expectDescription } = require('../utils/invocationTraceDescriptions');
+const { isRegExp } = require('../utils/isRegExp');
 const log = require('../utils/logger').child({ cat: 'ws-client, ws' });
+const mapLongPressArguments = require('../utils/mapLongPressArguments');
 const traceInvocationCall = require('../utils/traceInvocationCall').bind(null, log);
+
+const { systemElement, systemMatcher, systemExpect, isSystemElement } = require('./system');
+const { webElement, webMatcher, webExpect, isWebElement } = require('./web');
+
 
 const assertDirection = assertEnum(['left', 'right', 'up', 'down']);
 const assertSpeed = assertEnum(['fast', 'slow']);
@@ -21,10 +27,15 @@ class Expect {
     this.modifiers = [];
   }
 
+  get not() {
+    this.modifiers.push('not');
+    return this;
+  }
+
   toBeVisible(percent) {
     if (percent !== undefined && (!Number.isSafeInteger(percent) || percent < 1 || percent > 100)) {
       throw new Error('`percent` must be an integer between 1 and 100, but got '
-                      + (percent + (' (' + (typeof percent + ')'))));
+        + (percent + (' (' + (typeof percent + ')'))));
     }
 
     const traceDescription = expectDescription.toBeVisible(percent);
@@ -98,11 +109,6 @@ class Expect {
     return this.toHaveValue(`${Number(value)}`);
   }
 
-  get not() {
-    this.modifiers.push('not');
-    return this;
-  }
-
   createInvocation(expectation, ...params) {
     const definedParams = _.without(params, undefined);
     return {
@@ -116,7 +122,7 @@ class Expect {
   }
 
   expect(expectation, traceDescription, ...params) {
-    assert(traceDescription, `must provide trace description for expectation: \n ${JSON.stringify(expectation)}`);
+    assertTraceDescription(traceDescription);
 
     const invocation = this.createInvocation(expectation, ...params);
     traceDescription = expectDescription.full(traceDescription, this.modifiers.includes('not'));
@@ -150,25 +156,21 @@ class Element {
   }
 
   tap(point) {
-    if (point) {
-      if (typeof point !== 'object') throw new Error('point should be a object, but got ' + (point + (' (' + (typeof point + ')'))));
-      if (typeof point.x !== 'number') throw new Error('point.x should be a number, but got ' + (point.x + (' (' + (typeof point.x + ')'))));
-      if (typeof point.y !== 'number') throw new Error('point.y should be a number, but got ' + (point.y + (' (' + (typeof point.y + ')'))));
-    }
+    _assertValidPoint(point);
 
     const traceDescription = actionDescription.tapAtPoint(point);
     return this.withAction('tap', traceDescription, point);
   }
 
-  longPress(duration = 1000) {
-    if (typeof duration !== 'number') throw new Error('duration should be a number, but got ' + (duration + (' (' + (typeof duration + ')'))));
+  longPress(arg1, arg2) {
+    let { point, duration } = mapLongPressArguments(arg1, arg2);
 
-    const traceDescription = actionDescription.longPress(duration);
-    return this.withAction('longPress', traceDescription, duration);
+    const traceDescription = actionDescription.longPress(point, duration);
+    return this.withAction('longPress', traceDescription, point, duration);
   }
 
   longPressAndDrag(duration, normalizedPositionX, normalizedPositionY, targetElement,
-            normalizedTargetPositionX = NaN, normalizedTargetPositionY = NaN, speed = 'fast', holdDuration = 1000) {
+                   normalizedTargetPositionX = NaN, normalizedTargetPositionY = NaN, speed = 'fast', holdDuration = 1000) {
     if (typeof duration !== 'number') throw new Error('duration should be a number, but got ' + (duration + (' (' + (typeof duration + ')'))));
 
     if (!(targetElement instanceof Element)) throwElementError(targetElement);
@@ -228,6 +230,13 @@ class Element {
     return this.withAction('clearText', traceDescription);
   }
 
+  performAccessibilityAction(actionName) {
+    if (typeof actionName !== 'string') throw new Error('actionName should be a string, but got ' + (actionName + (' (' + (typeof actionName + ')'))));
+
+    const traceDescription = actionDescription.performAccessibilityAction(actionName);
+    return this.withAction('accessibilityAction', traceDescription, actionName);
+  }
+
   scroll(pixels, direction = 'down', startPositionX = NaN, startPositionY = NaN) {
     if (!['left', 'right', 'up', 'down'].some(option => option === direction)) throw new Error('direction should be one of [left, right, up, down], but got ' + direction);
     if (typeof pixels !== 'number') throw new Error('amount of pixels should be a number, but got ' + (pixels + (' (' + (typeof pixels + ')'))));
@@ -238,10 +247,13 @@ class Element {
     return this.withAction('scroll', traceDescription, pixels, direction, startPositionX, startPositionY);
   }
 
-  scrollTo(edge) {
+  scrollTo(edge, startPositionX = NaN, startPositionY = NaN) {
     if (!['left', 'right', 'top', 'bottom'].some(option => option === edge)) throw new Error('edge should be one of [left, right, top, bottom], but got ' + edge);
-    const traceDescription = actionDescription.scrollTo(edge);
-    return this.withAction('scrollTo', traceDescription, edge);
+    if (typeof startPositionX !== 'number') throw new Error('startPositionX should be a number, but got ' + (startPositionX + (' (' + (typeof startPositionX + ')'))));
+    if (typeof startPositionY !== 'number') throw new Error('startPositionY should be a number, but got ' + (startPositionY + (' (' + (typeof startPositionY + ')'))));
+
+    const traceDescription = actionDescription.scrollTo(edge, startPositionX, startPositionY);
+    return this.withAction('scrollTo', traceDescription, edge, startPositionX, startPositionY);
   }
 
   swipe(direction, speed = 'fast', normalizedSwipeOffset = NaN, normalizedStartingPointX = NaN, normalizedStartingPointY = NaN) {
@@ -275,6 +287,9 @@ class Element {
   setDatePickerDate(dateString, dateFormat) {
     if (typeof dateString !== 'string') throw new Error('dateString should be a string, but got ' + (dateString + (' (' + (typeof dateString + ')'))));
     if (typeof dateFormat !== 'string') throw new Error('dateFormat should be a string, but got ' + (dateFormat + (' (' + (typeof dateFormat + ')'))));
+    if (dateFormat === 'ISO8601') {
+      dateString = removeMilliseconds(dateString);
+    }
 
     const traceDescription = actionDescription.setDatePickerDate(dateString, dateFormat);
     return this.withAction('setDatePickerDate', traceDescription, dateString, dateFormat);
@@ -359,6 +374,14 @@ class InternalElement extends Element {
 }
 
 class By {
+  get web() {
+    return webMatcher();
+  }
+
+  get system() {
+    return systemMatcher();
+  }
+
   id(id) {
     return new Matcher().id(id);
   }
@@ -386,26 +409,31 @@ class By {
   value(value) {
     return new Matcher().value(value);
   }
-
-  get web() {
-    throw new Error('Detox does not support by.web matchers on iOS.');
-  }
 }
 
 class Matcher {
+  /** @private */
+  static *predicates(matcher) {
+    if (matcher.predicate.type === 'and') {
+      yield* matcher.predicate.predicates;
+    } else {
+      yield matcher.predicate;
+    }
+  }
+
   accessibilityLabel(label) {
     return this.label(label);
   }
 
   label(label) {
-    if (typeof label !== 'string') throw new Error('label should be a string, but got ' + (label + (' (' + (typeof label + ')'))));
-    this.predicate = { type: 'label', value: label };
+    if (typeof label !== 'string' && !isRegExp(label)) throw new Error('label should be a string or regex, but got ' + (label + (' (' + (typeof label + ')'))));
+    this.predicate = { type: 'label', value: label.toString(), isRegex: isRegExp(label) };
     return this;
   }
 
   id(id) {
-    if (typeof id !== 'string') throw new Error('id should be a string, but got ' + (id + (' (' + (typeof id + ')'))));
-    this.predicate = { type: 'id', value: id };
+    if (typeof id !== 'string' && !isRegExp(id)) throw new Error('id should be a string or regex, but got ' + (id + (' (' + (typeof id + ')'))));
+    this.predicate = { type: 'id', value: id.toString(), isRegex: isRegExp(id) };
     return this;
   }
 
@@ -428,8 +456,8 @@ class Matcher {
   }
 
   text(text) {
-    if (typeof text !== 'string') throw new Error('text should be a string, but got ' + (text + (' (' + (typeof text + ')'))));
-    this.predicate = { type: 'text', value: text };
+    if (typeof text !== 'string' && !isRegExp(text)) throw new Error(`text should be a string or regex, but got ` + (text + (' (' + (typeof text + ')'))));
+    this.predicate = { type: 'text', value: text.toString(), isRegex: isRegExp(text) };
     return this;
   }
 
@@ -462,15 +490,6 @@ class Matcher {
 
     return result;
   }
-
-  /** @private */
-  static *predicates(matcher) {
-    if (matcher.predicate.type === 'and') {
-      yield* matcher.predicate.predicates;
-    } else {
-      yield matcher.predicate;
-    }
-  }
 }
 
 class WaitFor {
@@ -479,6 +498,11 @@ class WaitFor {
     this.element = new InternalElement(invocationManager, emitter, element.matcher, element.index);
     this.expectation = new InternalExpect(invocationManager, this.element);
     this._emitter = emitter;
+  }
+
+  get not() {
+    this.expectation.not;
+    return this;
   }
 
   toBeVisible(percent) {
@@ -541,8 +565,13 @@ class WaitFor {
     return this;
   }
 
-  get not() {
-    this.expectation.not;
+  toBeFocused() {
+    this.expectation = this.expectation.toBeFocused();
+    return this;
+  }
+
+  toBeNotFocused() {
+    this.expectation = this.expectation.toBeNotFocused();
     return this;
   }
 
@@ -567,9 +596,12 @@ class WaitFor {
     return this.waitForWithAction(traceDescription);
   }
 
-  longPress(duration) {
-    this.action = this.actionableElement.longPress(duration);
-    const traceDescription = actionDescription.longPress(duration);
+  longPress(arg1, arg2) {
+    this.action = this.actionableElement.longPress(arg1, arg2);
+
+    let { point, duration } = mapLongPressArguments(arg1, arg2);
+    const traceDescription = actionDescription.longPress(point, duration);
+
     return this.waitForWithAction(traceDescription);
   }
 
@@ -646,6 +678,12 @@ class WaitFor {
     return this.waitForWithAction(traceDescription);
   }
 
+  performAccessibilityAction(actionName) {
+    this.action = this.actionableElement.performAccessibilityAction(actionName);
+    const traceDescription = actionDescription.performAccessibilityAction(actionName);
+    return this.waitForWithAction(traceDescription);
+  }
+
   pinch(scale, speed, angle) {
     this.action = this.actionableElement.pinch(scale, speed, angle);
     const traceDescription = actionDescription.pinch(scale, speed, angle);
@@ -701,6 +739,7 @@ function element(invocationManager, emitter, matcher) {
   if (!(matcher instanceof Matcher)) {
     throwMatcherError(matcher);
   }
+
   return new Element(invocationManager, emitter, matcher);
 }
 
@@ -708,6 +747,7 @@ function expect(invocationManager, element) {
   if (!(element instanceof Element)) {
     throwMatcherError(element);
   }
+
   return new Expect(invocationManager, element);
 }
 
@@ -719,15 +759,18 @@ function waitFor(invocationManager, emitter, element) {
 }
 
 class IosExpect {
-  constructor({ invocationManager, emitter }) {
+  constructor({ invocationManager, xcuitestRunner, emitter }) {
     this._invocationManager = invocationManager;
+    this._xcuitestRunner = xcuitestRunner;
     this._emitter = emitter;
     this.element = this.element.bind(this);
     this.expect = this.expect.bind(this);
     this.waitFor = this.waitFor.bind(this);
     this.by = new By();
     this.web = this.web.bind(this);
-    this.web.element = this.web;
+    this.web.element = this.web().element;
+    this.system = this.system.bind(this);
+    this.system.element = this.system().element;
   }
 
   element(matcher) {
@@ -735,6 +778,14 @@ class IosExpect {
   }
 
   expect(element) {
+    if (isSystemElement(element)) {
+      return systemExpect(this._xcuitestRunner, element);
+    }
+
+    if (isWebElement(element)) {
+      return webExpect(this._invocationManager, this._xcuitestRunner, element);
+    }
+
     return expect(this._invocationManager, element);
   }
 
@@ -742,9 +793,43 @@ class IosExpect {
     return waitFor(this._invocationManager, this._emitter, element);
   }
 
-  web(_matcher) {
-    throw new Error('Detox does not support web(), web.element() API on iOS.');
+  web(matcher) {
+    return {
+      atIndex: index => {
+        if (typeof index !== 'number' || index < 0) throw new Error('index should be an integer, got ' + (index + (' (' + (typeof index + ')'))));
+        if (!(matcher instanceof Matcher)) throw new Error('cannot apply atIndex to a non-matcher');
+        matcher.index = index;
+        return this.web(matcher);
+      },
+      element: webMatcher => {
+        if (!(matcher instanceof Matcher) && matcher !== undefined) {
+          throwMatcherError(matcher);
+        }
+
+        const webViewElement = matcher ? element(this._invocationManager, this._emitter, matcher) : undefined;
+        return webElement(this._invocationManager, this._xcuitestRunner, this._emitter, webViewElement, webMatcher);
+      }
+    };
   }
+
+  system() {
+    return {
+      element: systemMatcher => {
+        return systemElement(this._xcuitestRunner, systemMatcher);
+      }
+    };
+  }
+}
+
+function _assertValidPoint(point) {
+  if (!point) {
+    // point is optional
+    return;
+  }
+
+  if (typeof point !== 'object') throw new Error('point should be a object, but got ' + (point + (' (' + (typeof point + ')'))));
+  if (typeof point.x !== 'number') throw new Error('point.x should be a number, but got ' + (point.x + (' (' + (typeof point.x + ')'))));
+  if (typeof point.y !== 'number') throw new Error('point.y should be a number, but got ' + (point.y + (' (' + (typeof point.y + ')'))));
 }
 
 function throwMatcherError(param) {

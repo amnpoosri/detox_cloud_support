@@ -15,10 +15,10 @@ run_f "npm run build:android"
 popd
 
 pushd examples/demo-react-native
-  run_f "npm run build:android-release"
-  run_f "npm run test:android-release"
+  run_f "npm run build:android-debug"
+  run_f "npm run test:android-debug"
 
-  # Run tests with bloated JS bundle:
+  # Run tests in release mode with bloated JS bundle:
   source $SCRIPTS_PATH/demo-rn-bloat-bundle-test.sh android
 popd
 
@@ -37,9 +37,4 @@ popd
 
 pushd detox
   run_f "npm run build:android-native"
-popd
-
-pushd examples/demo-pure-native-android
-  export ANDROID_SERIAL=`adb devices | grep emulator | head -1 | awk '{print $1}'`
-  run_f "./gradlew connectAndroidTest"
 popd

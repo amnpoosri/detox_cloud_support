@@ -1,13 +1,13 @@
 {
   "name": "demo-plugin",
-  "version": "20.1.2",
+  "version": "20.23.1",
   "private": true,
   "scripts": {
     "test:plugin": "detox test --configuration plugin -l verbose"
   },
   "devDependencies": {
-    "detox": "^20.1.2",
-    "jest": "^28.0.0"
+    "detox": "^20.23.1",
+    "jest": "^29.0.0"
   },
   "detox": {
     "testRunner": {

@@ -1,4 +1,4 @@
-const DetoxRuntimeError = require('../errors/DetoxRuntimeError');
+const { DetoxInternalError, DetoxRuntimeError } = require('../errors');
 
 function firstEntry(obj) {
   return Object.entries(obj)[0];
@@ -36,9 +36,46 @@ function assertEnum(allowedValues) {
   };
 }
 
+function assertDuration(duration) {
+  if (typeof duration === 'number') {
+    return true;
+  }
+
+  throw new DetoxRuntimeError('duration should be a number, but got ' + (duration + (' (' + (typeof duration + ')'))));
+}
+
+function assertPoint(point) {
+  if (typeof point === 'object' && typeof point.x === 'number' &&  typeof point.y === 'number') {
+    return true;
+  }
+
+  throw new DetoxRuntimeError(`point should be an object with x and y properties, but got ${JSON.stringify(point)}`);
+}
+
+function assertUndefined(arg) {
+  if (arg === undefined) {
+    return true;
+  }
+
+  const [key, value] = firstEntry(arg);
+  throw new DetoxRuntimeError(`${key} expected to be undefined, but got ${value} (${typeof value})`);
+}
+
+function assertTraceDescription(arg) {
+  if (arg !== undefined) {
+    return true;
+  }
+
+  throw new DetoxInternalError(`traceDescription expected to be defined, but got undefined`);
+}
+
 module.exports = {
   assertEnum,
   assertNormalized,
   assertNumber,
   assertString,
+  assertDuration,
+  assertPoint,
+  assertUndefined,
+  assertTraceDescription
 };

@@ -53,7 +53,7 @@ class Element : NSObject {
 		return array
 	}
 	
-	private var view : NSObject {
+	var view : NSObject {
 		let array = self.views
 		
 		let element : NSObject
@@ -140,10 +140,13 @@ class Element : NSObject {
 		view.dtx_pinch(withScale: scale, velocity: velocity, angle: angle)
 	}
 	
-	func scroll(to edge: UIRectEdge) {
+	func scroll(to edge: UIRectEdge, normalizedStartingPoint: CGPoint? = nil) {
 		let scrollView = extractScrollView()
-		
-		scrollView.dtx_scroll(to: edge)
+		if let normalizedStartingPoint = normalizedStartingPoint {
+			scrollView.dtx_scroll(to: edge, normalizedStarting: normalizedStartingPoint)
+		} else {
+			scrollView.dtx_scroll(to: edge)
+		}
 	}
 
 	func scroll(withOffset offset: CGPoint, normalizedStartingPoint: CGPoint? = nil) {
@@ -166,6 +169,14 @@ class Element : NSObject {
 
 	func replaceText(_ text: String) {
 		view.dtx_replaceText(text)
+	}
+
+	func performAccessibilityAction(_ actionName: String) {
+		guard let action = view.accessibilityCustomActions?.first(where: { $0.name == actionName }) else {
+			dtx_fatalError("Accessibility custom action with name “\(actionName)” not found for view “\(view.dtx_shortDescription)”", viewDescription: debugAttributes)
+		}
+
+		action.target?.performSelector(onMainThread: action.selector, with: action, waitUntilDone: true)
 	}
 	
 	func adjust(toDate date: Date) {
